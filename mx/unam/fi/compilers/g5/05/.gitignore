@@ -1,0 +1,9 @@
+*.dot
+*.png
+ast.dot
+ast.png
+.DS_Store
+.DS_Store
+**/.DS_Store
+.DS_Store
+**/.DS_Store
