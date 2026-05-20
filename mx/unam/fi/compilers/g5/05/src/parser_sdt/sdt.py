@@ -1,8 +1,10 @@
 class Nodo:
-    def __init__(self, tipo, valor=None, hijos=None):
+    def __init__(self, tipo, valor=None, hijos=None, linea=None, columna=None):
         self.tipo = tipo
         self.valor = valor
         self.hijos = hijos if hijos else []
+        self.linea = linea
+        self.columna = columna
 
     def __repr__(self):
         return f"Nodo({self.tipo}, {self.valor}, {self.hijos})"
@@ -20,6 +22,25 @@ RANGOS = {
 }
 
 
+def formatear_valor(valor):
+    return repr(valor) if isinstance(valor, str) else valor
+
+
+def error_semantico(mensaje, posiciones=None, indice=0, nodo=None):
+    """Lanza errores semánticos con ubicación cuando está disponible."""
+    if nodo is not None and getattr(nodo, "linea", None) is not None:
+        raise Exception(
+            f"Semantic error at line {nodo.linea}, column {nodo.columna}: {mensaje}"
+        )
+
+    if posiciones and len(posiciones) > indice:
+        linea, columna = posiciones[indice]
+        if linea is not None and columna is not None:
+            raise Exception(f"Semantic error at line {linea}, column {columna}: {mensaje}")
+
+    raise Exception(f"Semantic error: {mensaje}")
+
+
 class TablaSimbolos:
     def __init__(self):
         self.simbolos = {}
@@ -27,31 +48,30 @@ class TablaSimbolos:
     def limpiar(self):
         self.simbolos = {}
 
-    def declarar(self, nombre, tipo):
-        tipo = normalizar_tipo(tipo)
+    def declarar(self, nombre, tipo, posiciones=None, indice=0):
+        tipo = normalizar_tipo(tipo, posiciones, indice)
         if tipo == "void":
-            raise Exception(f"Semantic error: variable '{nombre}' cannot be declared as void")
+            error_semantico(f"variable '{nombre}' cannot be declared as void", posiciones, indice)
         if nombre in self.simbolos:
-            raise Exception(f"Semantic error: variable '{nombre}' already declared")
+            error_semantico(f"variable '{nombre}' already declared", posiciones, indice)
         self.simbolos[nombre] = {'tipo': tipo, 'valor': None}
 
-    def asignar(self, nombre, valor):
+    def asignar(self, nombre, valor, posiciones=None, indice=0):
         if nombre not in self.simbolos:
-            raise Exception(f"Semantic error: variable '{nombre}' not declared")
+            error_semantico(f"variable '{nombre}' not declared", posiciones, indice)
         tipo_destino = self.simbolos[nombre]['tipo']
-        self.simbolos[nombre]['valor'] = convertir_a_tipo(valor, tipo_destino, nombre)
+        self.simbolos[nombre]['valor'] = convertir_a_tipo(
+            valor, tipo_destino, nombre, posiciones, indice
+        )
 
-    def obtener(self, nombre):
+    def obtener(self, nombre, posiciones=None, indice=0):
         if nombre not in self.simbolos:
-            raise Exception(f"Semantic error: variable '{nombre}' not declared")
+            error_semantico(f"variable '{nombre}' not declared", posiciones, indice)
         return self.simbolos[nombre]
 
     def mostrar(self):
         for nombre, datos in self.simbolos.items():
-            valor = datos['valor']
-            if isinstance(valor, str):
-                valor = repr(valor)
-            print(f"{nombre} -> type: {datos['tipo']}, value: {valor}")
+            print(f"{nombre} -> type: {datos['tipo']}, value: {formatear_valor(datos['valor'])}")
 
 
 tabla_simbolos = TablaSimbolos()
@@ -84,13 +104,13 @@ def buscar_variable(nombre):
     return None, None
 
 
-def normalizar_tipo(tipo):
+def normalizar_tipo(tipo, posiciones=None, indice=0):
     if tipo not in VALID_TYPES:
-        raise Exception(f"Semantic error: unknown type '{tipo}'")
+        error_semantico(f"unknown type '{tipo}'", posiciones, indice)
     return tipo
 
 
-def inferir_tipo_constante(valor):
+def inferir_tipo_constante(valor, nodo=None):
     if isinstance(valor, bool):
         return "bool"
     if isinstance(valor, int):
@@ -99,7 +119,7 @@ def inferir_tipo_constante(valor):
         return "double"
     if isinstance(valor, str) and len(valor) == 1:
         return "char"
-    raise Exception(f"Semantic error: invalid constant '{valor}'")
+    error_semantico(f"invalid constant '{valor}'", nodo=nodo)
 
 
 def valor_numerico(valor):
@@ -110,8 +130,8 @@ def valor_numerico(valor):
     return valor
 
 
-def convertir_a_tipo(valor, tipo_destino, nombre_var=None):
-    tipo_destino = normalizar_tipo(tipo_destino)
+def convertir_a_tipo(valor, tipo_destino, nombre_var=None, posiciones=None, indice=0, nodo=None):
+    tipo_destino = normalizar_tipo(tipo_destino, posiciones, indice)
     etiqueta = f" for variable '{nombre_var}'" if nombre_var else ""
 
     if tipo_destino == "bool":
@@ -126,11 +146,16 @@ def convertir_a_tipo(valor, tipo_destino, nombre_var=None):
             valor = 1 if valor else 0
         if isinstance(valor, float):
             if not valor.is_integer():
-                raise Exception(f"Semantic error: cannot assign non-integer float to char{etiqueta}")
+                error_semantico(
+                    f"cannot assign non-integer float to char{etiqueta}",
+                    posiciones,
+                    indice,
+                    nodo,
+                )
             valor = int(valor)
         if isinstance(valor, int) and 0 <= valor <= 255:
             return chr(valor)
-        raise Exception(f"Semantic error: value '{valor}' out of char range{etiqueta}")
+        error_semantico(f"value '{valor}' out of char range{etiqueta}", posiciones, indice, nodo)
 
     if tipo_destino in ENTEROS:
         if isinstance(valor, str) and len(valor) == 1:
@@ -139,15 +164,20 @@ def convertir_a_tipo(valor, tipo_destino, nombre_var=None):
             valor = 1 if valor else 0
         elif isinstance(valor, float):
             if not valor.is_integer():
-                raise Exception(f"Semantic error: cannot assign non-integer value {valor} to {tipo_destino}{etiqueta}")
+                error_semantico(
+                    f"cannot assign non-integer value {valor} to {tipo_destino}{etiqueta}",
+                    posiciones,
+                    indice,
+                    nodo,
+                )
             valor = int(valor)
 
         if not isinstance(valor, int):
-            raise Exception(f"Semantic error: cannot assign '{valor}' to {tipo_destino}{etiqueta}")
+            error_semantico(f"cannot assign '{valor}' to {tipo_destino}{etiqueta}", posiciones, indice, nodo)
 
         minimo, maximo = RANGOS[tipo_destino]
         if not (minimo <= valor <= maximo):
-            raise Exception(f"Semantic error: value {valor} out of range for {tipo_destino}{etiqueta}")
+            error_semantico(f"value {valor} out of range for {tipo_destino}{etiqueta}", posiciones, indice, nodo)
         return valor
 
     if tipo_destino in REALES:
@@ -157,16 +187,15 @@ def convertir_a_tipo(valor, tipo_destino, nombre_var=None):
             valor = 1 if valor else 0
         if isinstance(valor, (int, float)):
             return float(valor)
-        raise Exception(f"Semantic error: cannot assign '{valor}' to {tipo_destino}{etiqueta}")
+        error_semantico(f"cannot assign '{valor}' to {tipo_destino}{etiqueta}", posiciones, indice, nodo)
 
-    raise Exception(f"Semantic error: unsupported type '{tipo_destino}'")
+    error_semantico(f"unsupported type '{tipo_destino}'", posiciones, indice, nodo)
 
 
 def tipo_aritmetico(tipo_izq, tipo_der, operador):
-    # En C, char y bool se promocionan a int en expresiones aritméticas.
-    if tipo_izq in {"double"} or tipo_der in {"double"}:
+    if tipo_izq == "double" or tipo_der == "double":
         return "double"
-    if tipo_izq in {"float"} or tipo_der in {"float"}:
+    if tipo_izq == "float" or tipo_der == "float":
         return "float"
     return "int"
 
@@ -178,17 +207,17 @@ def evaluarexpresion(nodo, con_tipo=False):
 
 def evaluar_con_tipo(nodo):
     if nodo is None:
-        raise Exception("Semantic error: invalid expression")
+        error_semantico("invalid expression")
 
     if nodo.tipo == 'CONST':
-        return nodo.valor, inferir_tipo_constante(nodo.valor)
+        return nodo.valor, inferir_tipo_constante(nodo.valor, nodo)
 
     if nodo.tipo == 'ID':
         ambito, var_info = buscar_variable(nodo.valor)
         if ambito is None:
-            raise Exception(f"Semantic error: variable '{nodo.valor}' not declared")
+            error_semantico(f"variable '{nodo.valor}' not declared", nodo=nodo)
         if var_info['valor'] is None:
-            raise Exception(f"Semantic error: variable '{nodo.valor}' used before initialization")
+            error_semantico(f"variable '{nodo.valor}' used before initialization", nodo=nodo)
         return var_info['valor'], var_info['tipo']
 
     if nodo.tipo in {'+', '-', '*', '/'}:
@@ -206,7 +235,7 @@ def evaluar_con_tipo(nodo):
             valor = izq_num * der_num
         else:
             if der_num == 0:
-                raise Exception("Semantic error: division by zero")
+                error_semantico("division by zero", nodo=nodo)
             if tipo_res == "int":
                 valor = int(izq_num / der_num)  # división entera estilo C, truncada hacia 0
             else:
@@ -218,25 +247,26 @@ def evaluar_con_tipo(nodo):
             valor = float(valor)
         return valor, tipo_res
 
-    raise Exception(f"Unknown operator: {nodo.tipo}")
+    error_semantico(f"unknown operator '{nodo.tipo}'", nodo=nodo)
 
 
 def _declarar_item(tipo_dato, item):
     nombre_var = item.valor
     expr_nodo = item.hijos[0] if item.hijos else None
     tabla_actual = obtener_tabla_actual()
+    pos_item = [(item.linea, item.columna)] if item.linea is not None else None
 
-    tabla_actual.declarar(nombre_var, tipo_dato)
+    tabla_actual.declarar(nombre_var, tipo_dato, pos_item, 0)
 
     if expr_nodo is not None:
         valor = evaluarexpresion(expr_nodo)
-        tabla_actual.asignar(nombre_var, valor)
+        tabla_actual.asignar(nombre_var, valor, pos_item, 0)
 
-    hijos = [Nodo('TYPE', tipo_dato)]
+    hijos = [Nodo('TYPE', tipo_dato, linea=item.linea, columna=item.columna)]
     if expr_nodo is not None:
         hijos.append(expr_nodo)
 
-    return Nodo('DECL', nombre_var, hijos)
+    return Nodo('DECL', nombre_var, hijos, linea=item.linea, columna=item.columna)
 
 
 def _normalizar_lista_sentencias(nodo):
@@ -247,7 +277,7 @@ def _normalizar_lista_sentencias(nodo):
     return [nodo]
 
 
-def parsear_constante(val):
+def parsear_constante(val, posiciones=None, indice=0):
     if isinstance(val, (int, float, bool)):
         return val
     if isinstance(val, str):
@@ -260,16 +290,22 @@ def parsear_constante(val):
             escapes = {"\\n": "\n", "\\t": "\t", "\\r": "\r", "\\0": "\0", "\\'": "'", "\\\\": "\\"}
             contenido = escapes.get(contenido, contenido)
             if len(contenido) != 1:
-                raise Exception(f"Semantic error: invalid char literal {val}")
+                error_semantico(f"invalid char literal {val}", posiciones, indice)
             return contenido
         try:
             return float(val) if '.' in val else int(val)
         except ValueError:
-            raise Exception(f"Semantic error: invalid constant '{val}'")
-    raise Exception(f"Semantic error: invalid constant '{val}'")
+            error_semantico(f"invalid constant '{val}'", posiciones, indice)
+    error_semantico(f"invalid constant '{val}'", posiciones, indice)
 
 
-def accion_semantica(num_prod, elementos):
+def _pos(posiciones, indice):
+    if posiciones and len(posiciones) > indice:
+        return posiciones[indice]
+    return (None, None)
+
+
+def accion_semantica(num_prod, elementos, posiciones=None):
     #print(f"[DEBUG SDT] Producción: {num_prod}, elementos: {elementos}")
 
     if num_prod == 0:
@@ -287,49 +323,61 @@ def accion_semantica(num_prod, elementos):
     elif num_prod == 6:
         return elementos[0]
     elif num_prod == 7:
-        tipo_dato = normalizar_tipo(elementos[0])
+        tipo_dato = normalizar_tipo(elementos[0], posiciones, 0)
         decl_items = elementos[1] if isinstance(elementos[1], list) else [elementos[1]]
         declaraciones = [_declarar_item(tipo_dato, item) for item in decl_items]
-        return Nodo('DECL_LIST', tipo_dato, declaraciones)
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('DECL_LIST', tipo_dato, declaraciones, linea=linea, columna=columna)
     elif num_prod == 8:
         return [elementos[0]]
     elif num_prod == 9:
         return elementos[0] + [elementos[2]]
     elif num_prod == 10:
-        return Nodo('DECL_ITEM', elementos[0])
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('DECL_ITEM', elementos[0], linea=linea, columna=columna)
     elif num_prod == 11:
-        return Nodo('DECL_ITEM', elementos[0], [elementos[2]])
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('DECL_ITEM', elementos[0], [elementos[2]], linea=linea, columna=columna)
     elif num_prod == 12:
         nombre_var = elementos[0]
         expr_nodo = elementos[2]
         valor = evaluarexpresion(expr_nodo)
         ambito, _ = buscar_variable(nombre_var)
         if ambito is None:
-            raise Exception(f"Semantic error: variable '{nombre_var}' not declared")
-        ambito.asignar(nombre_var, valor)
-        return Nodo('ASSIGN', nombre_var, [expr_nodo])
+            error_semantico(f"variable '{nombre_var}' not declared", posiciones, 0)
+        ambito.asignar(nombre_var, valor, posiciones, 0)
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('ASSIGN', nombre_var, [expr_nodo], linea=linea, columna=columna)
     elif num_prod == 13:
-        return Nodo('BLOCK', None, _normalizar_lista_sentencias(elementos[1]))
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('BLOCK', None, _normalizar_lista_sentencias(elementos[1]), linea=linea, columna=columna)
     elif num_prod == 14:
-        return Nodo('BLOCK', None, [])
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('BLOCK', None, [], linea=linea, columna=columna)
     elif num_prod == 15:
-        return Nodo('+', None, [elementos[0], elementos[2]])
+        linea, columna = _pos(posiciones, 1)
+        return Nodo('+', None, [elementos[0], elementos[2]], linea=linea, columna=columna)
     elif num_prod == 16:
-        return Nodo('-', None, [elementos[0], elementos[2]])
+        linea, columna = _pos(posiciones, 1)
+        return Nodo('-', None, [elementos[0], elementos[2]], linea=linea, columna=columna)
     elif num_prod == 17:
         return elementos[0]
     elif num_prod == 18:
-        return Nodo('*', None, [elementos[0], elementos[2]])
+        linea, columna = _pos(posiciones, 1)
+        return Nodo('*', None, [elementos[0], elementos[2]], linea=linea, columna=columna)
     elif num_prod == 19:
-        return Nodo('/', None, [elementos[0], elementos[2]])
+        linea, columna = _pos(posiciones, 1)
+        return Nodo('/', None, [elementos[0], elementos[2]], linea=linea, columna=columna)
     elif num_prod == 20:
         return elementos[0]
     elif num_prod == 21:
         return elementos[1]
     elif num_prod == 22:
-        return Nodo('ID', elementos[0])
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('ID', elementos[0], linea=linea, columna=columna)
     elif num_prod == 23:
-        return Nodo('CONST', parsear_constante(elementos[0]))
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('CONST', parsear_constante(elementos[0], posiciones, 0), linea=linea, columna=columna)
     return None
 
 
@@ -337,8 +385,7 @@ def imprimir_arbol(nodo, nivel=0):
     if nodo is None:
         return
     sangria = "  " * nivel
-    valor = repr(nodo.valor) if isinstance(nodo.valor, str) else nodo.valor
-    print(f"{sangria}{nodo.tipo}: {valor}")
+    print(f"{sangria}{nodo.tipo}: {formatear_valor(nodo.valor)}")
     for hijo in nodo.hijos:
         imprimir_arbol(hijo, nivel + 1)
 
@@ -353,12 +400,15 @@ def exportar_arbol_graphviz(nodo, nombre_archivo="ast"):
     contador = [0]
     lineas = ["digraph AST {", '    node [shape=box, style="rounded"];']
 
+    def escapar_dot(texto):
+        return str(texto).replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+
     def recorrer(n):
         node_id = f"n{contador[0]}"
         contador[0] += 1
         etiqueta = n.tipo
         if n.valor is not None:
-            etiqueta += f"\\n{n.valor}"
+            etiqueta += f"\\n{escapar_dot(formatear_valor(n.valor))}"
         lineas.append(f'    {node_id} [label="{etiqueta}"];')
         for hijo in n.hijos:
             hijo_id = recorrer(hijo)

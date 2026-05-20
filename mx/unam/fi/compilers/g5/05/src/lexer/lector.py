@@ -23,7 +23,7 @@ def tokenize(code):
                     valor = comparar.group(0)
 
                     if tipo:
-                        lista_tokens.append((tipo, valor))
+                        lista_tokens.append((tipo, valor, num_linea, position + 1))
 
                     position += len(valor)
                     palabraval = True

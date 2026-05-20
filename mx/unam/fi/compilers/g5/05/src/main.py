@@ -23,8 +23,10 @@ def main():
                     else:
                         print("Lexer error...")
                         
-                except:
-                    print("Error, invalid location")
+                except Exception as e:
+                    print(f"Error interno: {e}")
+                    import traceback
+                    traceback.print_exc()
 
                 break
 
