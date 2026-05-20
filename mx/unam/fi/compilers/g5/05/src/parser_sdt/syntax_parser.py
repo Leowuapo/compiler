@@ -16,11 +16,19 @@ def mapear_tokens(tokens):
             simbolos.append('TYPE')
             lexemas.append(valor)
 
+        elif tipo == 'identifier' and valor in {'true', 'false'}:
+            simbolos.append('CONST')
+            lexemas.append(valor)
+
         elif tipo == 'identifier':
             simbolos.append('ID')
             lexemas.append(valor)
 
         elif tipo == 'constant':
+            simbolos.append('CONST')
+            lexemas.append(valor)
+        
+        elif tipo == 'literal':
             simbolos.append('CONST')
             lexemas.append(valor)
 
