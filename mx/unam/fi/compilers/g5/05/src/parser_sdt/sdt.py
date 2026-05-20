@@ -129,7 +129,7 @@ def _normalizar_lista_sentencias(nodo):
 
 
 def accion_semantica(num_prod, elementos):
-    print(f"[DEBUG SDT] Producción: {num_prod}, elementos: {elementos}")
+    #print(f"[DEBUG SDT] Producción: {num_prod}, elementos: {elementos}")
 
     # Program' → Program
     if num_prod == 0:

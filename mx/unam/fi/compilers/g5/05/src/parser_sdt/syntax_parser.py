@@ -81,9 +81,9 @@ def analizar(tokens):
 
     try:
         entrada, lexemas = mapear_tokens(tokens)
-        print(f"[DEBUG] Entrada (tokens): {entrada}")
-        print(f"[DEBUG] Lexemas: {lexemas}")
-        print(f"[DEBUG] Longitud de entrada: {len(entrada)}")
+        #print(f"[DEBUG] Entrada (tokens): {entrada}")
+        #print(f"[DEBUG] Lexemas: {lexemas}")
+        #print(f"[DEBUG] Longitud de entrada: {len(entrada)}")
     except Exception as e:
         print(f"Token mapping error: {e}")
         traceback.print_exc()
@@ -101,12 +101,12 @@ def analizar(tokens):
         estado = pila[-1]
         token = entrada[pos]
 
-        print(f"[DEBUG] Estado actual: {estado}, Token actual: '{token}', Posición: {pos}")
-        print(f"[DEBUG] Tabla ACTION para estado {estado}: {tabla_action.get(estado, {})}")
+        #print(f"[DEBUG] Estado actual: {estado}, Token actual: '{token}', Posición: {pos}")
+        #print(f"[DEBUG] Tabla ACTION para estado {estado}: {tabla_action.get(estado, {})}")
 
         accion = tabla_action.get(estado, {}).get(token)
 
-        print(f"[DEBUG] Acción encontrada: {accion}")
+        #print(f"[DEBUG] Acción encontrada: {accion}")
 
         if accion is None:
             print("Parsing error...")
