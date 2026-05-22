@@ -369,6 +369,25 @@ def _nodo_unario(operador, elementos, posiciones=None):
     )
 
 
+def _validar_condicion(condicion):
+    """
+    Valida semánticamente la condición del if.
+
+    No ejecuta el if.
+    Solo evalúa la expresión para detectar errores como:
+    - variable no declarada
+    - variable sin inicializar
+    - división entre cero
+    - operadores inválidos
+    """
+    valor, tipo = evaluarexpresion(condicion, con_tipo=True)
+
+    if tipo == "void":
+        error_semantico("if condition cannot be void", nodo=condicion)
+
+    return valor, tipo
+
+
 def accion_semantica(num_prod, elementos, posiciones=None):
     #print(f"[DEBUG SDT] Producción: {num_prod}, elementos: {elementos}")
 
@@ -488,6 +507,43 @@ def accion_semantica(num_prod, elementos, posiciones=None):
         linea, columna = _pos(posiciones, 0)
         return Nodo('CONST', parsear_constante(elementos[0], posiciones, 0), linea=linea, columna=columna)
     
+        # Statement -> IfStatement
+    elif num_prod == 39:
+        return elementos[0]
+
+    # IfStatement -> if ( E ) Block
+    elif num_prod == 40:
+        condicion = elementos[2]
+        bloque_then = elementos[4]
+
+        _validar_condicion(condicion)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'IF',
+            None,
+            [condicion, bloque_then],
+            linea=linea,
+            columna=columna
+        )
+
+    # IfStatement -> if ( E ) Block else Block
+    elif num_prod == 41:
+        condicion = elementos[2]
+        bloque_then = elementos[4]
+        bloque_else = elementos[6]
+
+        _validar_condicion(condicion)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'IF_ELSE',
+            None,
+            [condicion, bloque_then, bloque_else],
+            linea=linea,
+            columna=columna
+        )
+
     return None
 
 

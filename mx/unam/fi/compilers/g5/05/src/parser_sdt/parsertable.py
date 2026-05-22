@@ -59,6 +59,11 @@ productions = [
     ("Primary", ["(", "E", ")"]),
     ("Primary", ["ID"]),
     ("Primary", ["CONST"]),
+
+    # If / else
+    ("Statement", ["IfStatement"]),
+    ("IfStatement", ["if", "(", "E", ")", "Block"]),
+    ("IfStatement", ["if", "(", "E", ")", "Block", "else", "Block"]),
 ]
 
 prod_num = {}
@@ -68,14 +73,16 @@ for indice, (lado_izq, lado_der) in enumerate(productions):
 terminales = {
     "TYPE", "ID", "CONST", "=", ";", ",", "{", "}", "(", ")", "$",
     "||", "&&", "==", "!=", "<", ">", "<=", ">=",
-    "+", "-", "*", "/", "!"
+    "+", "-", "*", "/", "!",
+    "if", "else"
 }
 
 no_terminales = {
     "Program'", "Program", "StatementList", "Statement",
     "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
-    "AddExpr", "MulExpr", "UnaryExpr", "Primary"
+    "AddExpr", "MulExpr", "UnaryExpr", "Primary",
+    "IfStatement"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}
