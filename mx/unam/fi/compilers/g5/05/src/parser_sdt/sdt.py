@@ -388,6 +388,29 @@ def _validar_condicion(condicion):
     return valor, tipo
 
 
+def _crear_asignacion(nombre_var, expr_nodo, posiciones=None, aplicar=True):
+    valor = evaluarexpresion(expr_nodo)
+
+    ambito, var_info = buscar_variable(nombre_var)
+    if ambito is None:
+        error_semantico(f"variable '{nombre_var}' not declared", posiciones, 0)
+
+    if aplicar:
+        ambito.asignar(nombre_var, valor, posiciones, 0)
+    else:
+        # Solo valida compatibilidad de tipo, sin modificar la tabla.
+        convertir_a_tipo(valor, var_info['tipo'], nombre_var, posiciones, 0)
+
+    linea, columna = _pos(posiciones, 0)
+    return Nodo(
+        'ASSIGN',
+        nombre_var,
+        [expr_nodo],
+        linea=linea,
+        columna=columna
+    )
+
+
 def accion_semantica(produccion, elementos, posiciones=None):
     lhs, rhs = produccion
     rhs = tuple(rhs)
@@ -451,19 +474,12 @@ def accion_semantica(produccion, elementos, posiciones=None):
 
     # Asignación
     elif lhs == "Assignment" and rhs == ("ID", "=", "E"):
-        nombre_var = elementos[0]
-        expr_nodo = elementos[2]
-
-        valor = evaluarexpresion(expr_nodo)
-
-        ambito, _ = buscar_variable(nombre_var)
-        if ambito is None:
-            error_semantico(f"variable '{nombre_var}' not declared", posiciones, 0)
-
-        ambito.asignar(nombre_var, valor, posiciones, 0)
-
-        linea, columna = _pos(posiciones, 0)
-        return Nodo('ASSIGN', nombre_var, [expr_nodo], linea=linea, columna=columna)
+        return _crear_asignacion(
+            elementos[0],
+            elementos[2],
+            posiciones,
+            aplicar=True
+        )
 
     # Bloques
     elif lhs == "Block" and rhs == ("{", "StatementList", "}"):
@@ -526,6 +542,45 @@ def accion_semantica(produccion, elementos, posiciones=None):
             [condicion, bloque],
             linea=linea,
             columna=columna
+        )
+    
+    # For
+    elif lhs == "Statement" and rhs == ("ForStatement",):
+        return elementos[0]
+
+    elif lhs == "ForStatement" and rhs == (
+        "for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "Block"
+    ):
+        inicializacion = elementos[2]
+        condicion = elementos[4]
+        actualizacion = elementos[6]
+        bloque = elementos[8]
+
+        _validar_condicion(condicion)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'FOR',
+            None,
+            [inicializacion, condicion, actualizacion, bloque],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "ForInit" and rhs == ("ID", "=", "E"):
+        return _crear_asignacion(
+            elementos[0],
+            elementos[2],
+            posiciones,
+            aplicar=True
+        )
+
+    elif lhs == "ForUpdate" and rhs == ("ID", "=", "E"):
+        return _crear_asignacion(
+            elementos[0],
+            elementos[2],
+            posiciones,
+            aplicar=False
         )
 
     # Expresiones de paso directo

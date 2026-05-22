@@ -68,6 +68,12 @@ productions = [
     # While
     ("Statement", ["WhileStatement"]),
     ("WhileStatement", ["while", "(", "E", ")", "Block"]),
+
+    # For básico
+    ("Statement", ["ForStatement"]),
+    ("ForStatement", ["for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "Block"]),
+    ("ForInit", ["ID", "=", "E"]),
+    ("ForUpdate", ["ID", "=", "E"]),
 ]
 
 prod_num = {}
@@ -78,7 +84,7 @@ terminales = {
     "TYPE", "ID", "CONST", "=", ";", ",", "{", "}", "(", ")", "$",
     "||", "&&", "==", "!=", "<", ">", "<=", ">=",
     "+", "-", "*", "/", "!",
-    "if", "else", "while"
+    "if", "else", "while", "for"
 }
 
 no_terminales = {
@@ -86,7 +92,8 @@ no_terminales = {
     "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
-    "IfStatement", "WhileStatement"
+    "IfStatement", "WhileStatement", 
+    "ForStatement", "ForInit", "ForUpdate"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}
