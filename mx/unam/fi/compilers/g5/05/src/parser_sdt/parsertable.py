@@ -25,25 +25,58 @@ productions = [
     # Bloque con ámbito
     ("Block", ["{", "StatementList", "}"]),
     ("Block", ["{", "}"]),  # bloque vacío
-    
-    # Expresiones aritméticas
-    ("E", ["E", "+", "T"]),
-    ("E", ["E", "-", "T"]),
-    ("E", ["T"]),
-    ("T", ["T", "*", "F"]),
-    ("T", ["T", "/", "F"]),
-    ("T", ["F"]),
-    ("F", ["(", "E", ")"]),
-    ("F", ["ID"]),
-    ("F", ["CONST"]),
+
+    # Expresiones con precedencia, de menor a mayor
+    ("E", ["OrExpr"]),
+
+    ("OrExpr", ["OrExpr", "||", "AndExpr"]),
+    ("OrExpr", ["AndExpr"]),
+
+    ("AndExpr", ["AndExpr", "&&", "EqExpr"]),
+    ("AndExpr", ["EqExpr"]),
+
+    ("EqExpr", ["EqExpr", "==", "RelExpr"]),
+    ("EqExpr", ["EqExpr", "!=", "RelExpr"]),
+    ("EqExpr", ["RelExpr"]),
+
+    ("RelExpr", ["RelExpr", "<", "AddExpr"]),
+    ("RelExpr", ["RelExpr", ">", "AddExpr"]),
+    ("RelExpr", ["RelExpr", "<=", "AddExpr"]),
+    ("RelExpr", ["RelExpr", ">=", "AddExpr"]),
+    ("RelExpr", ["AddExpr"]),
+
+    ("AddExpr", ["AddExpr", "+", "MulExpr"]),
+    ("AddExpr", ["AddExpr", "-", "MulExpr"]),
+    ("AddExpr", ["MulExpr"]),
+
+    ("MulExpr", ["MulExpr", "*", "UnaryExpr"]),
+    ("MulExpr", ["MulExpr", "/", "UnaryExpr"]),
+    ("MulExpr", ["UnaryExpr"]),
+
+    ("UnaryExpr", ["!", "UnaryExpr"]),
+    ("UnaryExpr", ["Primary"]),
+
+    ("Primary", ["(", "E", ")"]),
+    ("Primary", ["ID"]),
+    ("Primary", ["CONST"]),
 ]
 
 prod_num = {}
 for indice, (lado_izq, lado_der) in enumerate(productions):
     prod_num[(lado_izq, tuple(lado_der))] = indice
 
-terminales = {"TYPE", "ID", "CONST", "=", ";", "+", "-", "*", "/", "(", ")", ",", "{", "}", "$"}
-no_terminales = {"Program'", "Program", "StatementList", "Statement", "Declaration", "DeclList", "DeclItem", "Assignment", "Block", "E", "T", "F"}
+terminales = {
+    "TYPE", "ID", "CONST", "=", ";", ",", "{", "}", "(", ")", "$",
+    "||", "&&", "==", "!=", "<", ">", "<=", ">=",
+    "+", "-", "*", "/", "!"
+}
+
+no_terminales = {
+    "Program'", "Program", "StatementList", "Statement",
+    "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
+    "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
+    "AddExpr", "MulExpr", "UnaryExpr", "Primary"
+}
 
 primeros = {s: set() for s in terminales | no_terminales}
 for t in terminales:
@@ -133,10 +166,20 @@ def fusionar_lalr(estados_lr1):
         nucleo_a_items[nucleo] |= items
     return list(nucleo_a_items.values())
 
+def agregar_action(action, estado, simbolo, nueva):
+    if simbolo in action[estado] and action[estado][simbolo] != nueva:
+        raise Exception(
+            f"LALR conflict in state {estado}, symbol {simbolo}: "
+            f"{action[estado][simbolo]} vs {nueva}"
+        )
+    action[estado][simbolo] = nueva
+
 def construir_tabla_lalr():
     estados_lr1, goto_trans, _ = construir_estados_lr1()
     estados_lalr = fusionar_lalr(estados_lr1)
+
     lr1_a_lalr = {}
+
     for i_lr1, items in enumerate(estados_lr1):
         nucleo = frozenset((lhs, rhs, punto) for lhs, rhs, punto, la in items)
         for j_lalr, lalr_items in enumerate(estados_lalr):
@@ -145,6 +188,7 @@ def construir_tabla_lalr():
                 break
 
     action = defaultdict(dict)
+
     go_to = defaultdict(dict)
 
     for i_lr1, j_lalr in lr1_a_lalr.items():
@@ -156,13 +200,13 @@ def construir_tabla_lalr():
                     if (i_lr1, a) in goto_trans:
                         nxt_lr1 = goto_trans[(i_lr1, a)]
                         nxt_lalr = lr1_a_lalr[nxt_lr1]
-                        action[j_lalr][a] = f"S{nxt_lalr}"
+                        agregar_action(action, j_lalr, a, f"S{nxt_lalr}")
             else:
-                if lhs == "Program'":  # Cambiado de "S'" a "Program'"
+                if lhs == "Program'":
                     action[j_lalr]["$"] = "acc"
                 else:
                     num = prod_num[(lhs, rhs)]
-                    action[j_lalr][la] = f"R{num}"
+                    agregar_action(action, j_lalr, la, f"R{num}")
 
     for (i_lr1, X), nxt_lr1 in goto_trans.items():
         if X in no_terminales:

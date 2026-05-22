@@ -130,6 +130,10 @@ def valor_numerico(valor):
     return valor
 
 
+def valor_booleano(valor):
+    return bool(valor_numerico(valor))
+
+
 def convertir_a_tipo(valor, tipo_destino, nombre_var=None, posiciones=None, indice=0, nodo=None):
     tipo_destino = normalizar_tipo(tipo_destino, posiciones, indice)
     etiqueta = f" for variable '{nombre_var}'" if nombre_var else ""
@@ -220,11 +224,47 @@ def evaluar_con_tipo(nodo):
             error_semantico(f"variable '{nodo.valor}' used before initialization", nodo=nodo)
         return var_info['valor'], var_info['tipo']
 
+    if nodo.tipo == '!':
+        valor, _ = evaluar_con_tipo(nodo.hijos[0])
+        return not valor_booleano(valor), "bool"
+
+    if nodo.tipo == '&&':
+        izq, _ = evaluar_con_tipo(nodo.hijos[0])
+        der, _ = evaluar_con_tipo(nodo.hijos[1])
+        return valor_booleano(izq) and valor_booleano(der), "bool"
+
+    if nodo.tipo == '||':
+        izq, _ = evaluar_con_tipo(nodo.hijos[0])
+        der, _ = evaluar_con_tipo(nodo.hijos[1])
+        return valor_booleano(izq) or valor_booleano(der), "bool"
+
+    if nodo.tipo in {'==', '!=', '<', '>', '<=', '>='}:
+        izq, _ = evaluar_con_tipo(nodo.hijos[0])
+        der, _ = evaluar_con_tipo(nodo.hijos[1])
+
+        izq_val = valor_numerico(izq)
+        der_val = valor_numerico(der)
+
+        if nodo.tipo == '==':
+            return izq_val == der_val, "bool"
+        if nodo.tipo == '!=':
+            return izq_val != der_val, "bool"
+        if nodo.tipo == '<':
+            return izq_val < der_val, "bool"
+        if nodo.tipo == '>':
+            return izq_val > der_val, "bool"
+        if nodo.tipo == '<=':
+            return izq_val <= der_val, "bool"
+        if nodo.tipo == '>=':
+            return izq_val >= der_val, "bool"
+
     if nodo.tipo in {'+', '-', '*', '/'}:
         izq, tipo_izq = evaluar_con_tipo(nodo.hijos[0])
         der, tipo_der = evaluar_con_tipo(nodo.hijos[1])
+
         izq_num = valor_numerico(izq)
         der_num = valor_numerico(der)
+
         tipo_res = tipo_aritmetico(tipo_izq, tipo_der, nodo.tipo)
 
         if nodo.tipo == '+':
@@ -236,8 +276,9 @@ def evaluar_con_tipo(nodo):
         else:
             if der_num == 0:
                 error_semantico("division by zero", nodo=nodo)
+
             if tipo_res == "int":
-                valor = int(izq_num / der_num)  # división entera estilo C, truncada hacia 0
+                valor = int(izq_num / der_num)
             else:
                 valor = izq_num / der_num
 
@@ -245,6 +286,7 @@ def evaluar_con_tipo(nodo):
             valor = int(valor)
         else:
             valor = float(valor)
+
         return valor, tipo_res
 
     error_semantico(f"unknown operator '{nodo.tipo}'", nodo=nodo)
@@ -305,6 +347,28 @@ def _pos(posiciones, indice):
     return (None, None)
 
 
+def _nodo_binario(operador, elementos, posiciones=None):
+    linea, columna = _pos(posiciones, 1)
+    return Nodo(
+        operador,
+        None,
+        [elementos[0], elementos[2]],
+        linea=linea,
+        columna=columna
+    )
+
+
+def _nodo_unario(operador, elementos, posiciones=None):
+    linea, columna = _pos(posiciones, 0)
+    return Nodo(
+        operador,
+        None,
+        [elementos[1]],
+        linea=linea,
+        columna=columna
+    )
+
+
 def accion_semantica(num_prod, elementos, posiciones=None):
     #print(f"[DEBUG SDT] Producción: {num_prod}, elementos: {elementos}")
 
@@ -354,30 +418,76 @@ def accion_semantica(num_prod, elementos, posiciones=None):
     elif num_prod == 14:
         linea, columna = _pos(posiciones, 0)
         return Nodo('BLOCK', None, [], linea=linea, columna=columna)
+    
+    
+    # E -> OrExpr
     elif num_prod == 15:
-        linea, columna = _pos(posiciones, 1)
-        return Nodo('+', None, [elementos[0], elementos[2]], linea=linea, columna=columna)
+        return elementos[0]
+
+    # OrExpr
     elif num_prod == 16:
-        linea, columna = _pos(posiciones, 1)
-        return Nodo('-', None, [elementos[0], elementos[2]], linea=linea, columna=columna)
+        return _nodo_binario('||', elementos, posiciones)
     elif num_prod == 17:
         return elementos[0]
+
+    # AndExpr
     elif num_prod == 18:
-        linea, columna = _pos(posiciones, 1)
-        return Nodo('*', None, [elementos[0], elementos[2]], linea=linea, columna=columna)
+        return _nodo_binario('&&', elementos, posiciones)
     elif num_prod == 19:
-        linea, columna = _pos(posiciones, 1)
-        return Nodo('/', None, [elementos[0], elementos[2]], linea=linea, columna=columna)
-    elif num_prod == 20:
         return elementos[0]
+
+    # EqExpr
+    elif num_prod == 20:
+        return _nodo_binario('==', elementos, posiciones)
     elif num_prod == 21:
-        return elementos[1]
+        return _nodo_binario('!=', elementos, posiciones)
     elif num_prod == 22:
+        return elementos[0]
+
+    # RelExpr
+    elif num_prod == 23:
+        return _nodo_binario('<', elementos, posiciones)
+    elif num_prod == 24:
+        return _nodo_binario('>', elementos, posiciones)
+    elif num_prod == 25:
+        return _nodo_binario('<=', elementos, posiciones)
+    elif num_prod == 26:
+        return _nodo_binario('>=', elementos, posiciones)
+    elif num_prod == 27:
+        return elementos[0]
+
+    # AddExpr
+    elif num_prod == 28:
+        return _nodo_binario('+', elementos, posiciones)
+    elif num_prod == 29:
+        return _nodo_binario('-', elementos, posiciones)
+    elif num_prod == 30:
+        return elementos[0]
+
+    # MulExpr
+    elif num_prod == 31:
+        return _nodo_binario('*', elementos, posiciones)
+    elif num_prod == 32:
+        return _nodo_binario('/', elementos, posiciones)
+    elif num_prod == 33:
+        return elementos[0]
+
+    # UnaryExpr
+    elif num_prod == 34:
+        return _nodo_unario('!', elementos, posiciones)
+    elif num_prod == 35:
+        return elementos[0]
+
+    # Primary
+    elif num_prod == 36:
+        return elementos[1]
+    elif num_prod == 37:
         linea, columna = _pos(posiciones, 0)
         return Nodo('ID', elementos[0], linea=linea, columna=columna)
-    elif num_prod == 23:
+    elif num_prod == 38:
         linea, columna = _pos(posiciones, 0)
         return Nodo('CONST', parsear_constante(elementos[0], posiciones, 0), linea=linea, columna=columna)
+    
     return None
 
 
