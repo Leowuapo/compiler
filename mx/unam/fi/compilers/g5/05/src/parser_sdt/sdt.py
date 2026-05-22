@@ -411,6 +411,79 @@ def _crear_asignacion(nombre_var, expr_nodo, posiciones=None, aplicar=True):
     )
 
 
+def _crear_incdec(nombre_var, operador, posiciones=None, aplicar=False):
+    ambito, var_info = buscar_variable(nombre_var)
+
+    if ambito is None:
+        error_semantico(f"variable '{nombre_var}' not declared", posiciones, 0)
+
+    if var_info['valor'] is None:
+        error_semantico(f"variable '{nombre_var}' used before initialization", posiciones, 0)
+
+    tipo_var = var_info['tipo']
+
+    if tipo_var not in ENTEROS | REALES | {"char"}:
+        error_semantico(
+            f"operator '{operador}' cannot be applied to type '{tipo_var}'",
+            posiciones,
+            0
+        )
+
+    valor_actual = valor_numerico(var_info['valor'])
+
+    if operador == "++":
+        nuevo_valor = valor_actual + 1
+    else:
+        nuevo_valor = valor_actual - 1
+
+    if aplicar:
+        ambito.asignar(nombre_var, nuevo_valor, posiciones, 0)
+    else:
+        convertir_a_tipo(nuevo_valor, tipo_var, nombre_var, posiciones, 0)
+
+    linea, columna = _pos(posiciones, 0)
+    return Nodo(
+        operador,
+        nombre_var,
+        [],
+        linea=linea,
+        columna=columna
+    )
+
+
+def _validar_switch(expr_switch, cases, default_item=None, posiciones=None):
+    valor_switch, tipo_switch = evaluarexpresion(expr_switch, con_tipo=True)
+
+    valores_vistos = set()
+
+    for case in cases:
+        const_nodo = case.hijos[0]
+        valor_case, tipo_case = evaluarexpresion(const_nodo, con_tipo=True)
+
+        try:
+            valor_convertido = convertir_a_tipo(
+                valor_case,
+                tipo_switch,
+                None,
+                posiciones,
+                0,
+                nodo=const_nodo
+            )
+        except Exception:
+            error_semantico(
+                f"case value type '{tipo_case}' is not compatible with switch type '{tipo_switch}'",
+                nodo=const_nodo
+            )
+
+        if valor_convertido in valores_vistos:
+            error_semantico(
+                f"duplicate case value '{valor_convertido}'",
+                nodo=const_nodo
+            )
+
+        valores_vistos.add(valor_convertido)
+
+
 def accion_semantica(produccion, elementos, posiciones=None):
     lhs, rhs = produccion
     rhs = tuple(rhs)
@@ -584,6 +657,113 @@ def accion_semantica(produccion, elementos, posiciones=None):
             elementos[2],
             posiciones,
             aplicar=False
+        )
+    
+    elif lhs == "ForUpdate" and rhs == ("ID", "++"):
+        return _crear_incdec(
+            elementos[0],
+            "++",
+            posiciones,
+            aplicar=False
+        )
+
+    elif lhs == "ForUpdate" and rhs == ("ID", "--"):
+        return _crear_incdec(
+            elementos[0],
+            "--",
+            posiciones,
+            aplicar=False
+    )
+
+    # Switch
+    elif lhs == "Statement" and rhs == ("SwitchStatement",):
+        return elementos[0]
+
+    elif lhs == "SwitchStatement" and rhs == (
+        "switch", "(", "E", ")", "{", "CaseList", "}"
+    ):
+        expr_switch = elementos[2]
+        cases = elementos[5]
+        _validar_switch(expr_switch, cases, None, posiciones)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'SWITCH',
+            None,
+            [expr_switch] + cases,
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "SwitchStatement" and rhs == (
+        "switch", "(", "E", ")", "{", "CaseList", "DefaultItem", "}"
+    ):
+        expr_switch = elementos[2]
+        cases = elementos[5]
+        default_item = elementos[6]
+
+        _validar_switch(expr_switch, cases, default_item, posiciones)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'SWITCH',
+            None,
+            [expr_switch] + cases + [default_item],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "SwitchStatement" and rhs == (
+        "switch", "(", "E", ")", "{", "DefaultItem", "}"
+    ):
+        expr_switch = elementos[2]
+        default_item = elementos[5]
+
+        evaluarexpresion(expr_switch, con_tipo=True)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'SWITCH',
+            None,
+            [expr_switch, default_item],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "CaseList" and rhs == ("CaseItem",):
+        return [elementos[0]]
+
+    elif lhs == "CaseList" and rhs == ("CaseList", "CaseItem"):
+        return elementos[0] + [elementos[1]]
+
+    elif lhs == "CaseItem" and rhs == ("case", "CONST", ":", "Block"):
+        linea, columna = _pos(posiciones, 0)
+        const_linea, const_columna = _pos(posiciones, 1)
+
+        return Nodo(
+            'CASE',
+            None,
+            [
+                Nodo(
+                    'CONST',
+                    parsear_constante(elementos[1], posiciones, 1),
+                    linea=const_linea,
+                    columna=const_columna
+                ),
+                elementos[3]
+            ],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "DefaultItem" and rhs == ("default", ":", "Block"):
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'DEFAULT',
+            None,
+            [elementos[2]],
+            linea=linea,
+            columna=columna
         )
 
     # Expresiones de paso directo

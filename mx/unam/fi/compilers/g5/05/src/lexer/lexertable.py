@@ -45,6 +45,7 @@ token = [
     (r'\[', 'punctuation'),
     (r'\]', 'punctuation'),
     (r';', 'punctuation'),
+    (r':', 'punctuation'),
     (r',', 'punctuation'),
     (r'\.', 'punctuation'),
 

@@ -18,7 +18,10 @@ def mapear_tokens(tokens):
             lexemas.append(valor)
             posiciones.append((linea, columna))
         
-        elif tipo == 'keyword' and valor in {'if', 'else', 'while', 'for'}:
+        elif tipo == 'keyword' and valor in {
+            'if', 'else', 'while', 'for',
+            'switch', 'case', 'default'
+        }:
             simbolos.append(valor)
             lexemas.append(valor)
             posiciones.append((linea, columna))
@@ -46,7 +49,8 @@ def mapear_tokens(tokens):
         elif tipo == 'operator' and valor in {
             '=', '+', '-', '*', '/',
             '&&', '||', '!',
-            '==', '!=', '<', '>', '<=', '>='
+            '==', '!=', '<', '>', '<=', '>=',
+            '++', '--'
         }:
             simbolos.append(valor)
             lexemas.append(valor)
@@ -79,6 +83,11 @@ def mapear_tokens(tokens):
 
         elif tipo == 'punctuation' and valor == '}':
             simbolos.append('}')
+            lexemas.append(valor)
+            posiciones.append((linea, columna))
+        
+        elif tipo == 'punctuation' and valor == ':':
+            simbolos.append(':')
             lexemas.append(valor)
             posiciones.append((linea, columna))
 

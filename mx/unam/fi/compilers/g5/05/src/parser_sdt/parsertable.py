@@ -75,6 +75,21 @@ productions = [
     ("ForInit", ["ID", "=", "E"]),
     ("ForInit", ["Declaration"]),
     ("ForUpdate", ["ID", "=", "E"]),
+    ("ForUpdate", ["ID", "++"]),
+    ("ForUpdate", ["ID", "--"]),
+
+    # Switch
+    ("Statement", ["SwitchStatement"]),
+    ("SwitchStatement", ["switch", "(", "E", ")", "{", "CaseList", "}"]),
+    ("SwitchStatement", ["switch", "(", "E", ")", "{", "CaseList", "DefaultItem", "}"]),
+    ("SwitchStatement", ["switch", "(", "E", ")", "{", "DefaultItem", "}"]),
+
+    ("CaseList", ["CaseItem"]),
+    ("CaseList", ["CaseList", "CaseItem"]),
+
+    ("CaseItem", ["case", "CONST", ":", "Block"]),
+
+    ("DefaultItem", ["default", ":", "Block"]),
 ]
 
 prod_num = {}
@@ -82,10 +97,12 @@ for indice, (lado_izq, lado_der) in enumerate(productions):
     prod_num[(lado_izq, tuple(lado_der))] = indice
 
 terminales = {
-    "TYPE", "ID", "CONST", "=", ";", ",", "{", "}", "(", ")", "$",
+    "TYPE", "ID", "CONST", "=", ";", ":", ",", "{", "}", "(", ")", "$",
     "||", "&&", "==", "!=", "<", ">", "<=", ">=",
     "+", "-", "*", "/", "!",
-    "if", "else", "while", "for"
+    "++", "--",
+    "if", "else", "while", "for",
+    "switch", "case", "default"
 }
 
 no_terminales = {
@@ -94,7 +111,8 @@ no_terminales = {
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
     "IfStatement", "WhileStatement", 
-    "ForStatement", "ForInit", "ForUpdate"
+    "ForStatement", "ForInit", "ForUpdate",
+    "SwitchStatement", "CaseList", "CaseItem", "DefaultItem"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}
