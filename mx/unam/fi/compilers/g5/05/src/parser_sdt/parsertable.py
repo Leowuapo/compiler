@@ -69,10 +69,11 @@ productions = [
     ("Statement", ["WhileStatement"]),
     ("WhileStatement", ["while", "(", "E", ")", "Block"]),
 
-    # For básico
+    # For
     ("Statement", ["ForStatement"]),
     ("ForStatement", ["for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "Block"]),
     ("ForInit", ["ID", "=", "E"]),
+    ("ForInit", ["Declaration"]),
     ("ForUpdate", ["ID", "=", "E"]),
 ]
 

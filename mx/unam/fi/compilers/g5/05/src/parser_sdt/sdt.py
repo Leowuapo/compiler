@@ -575,6 +575,9 @@ def accion_semantica(produccion, elementos, posiciones=None):
             aplicar=True
         )
 
+    elif lhs == "ForInit" and rhs == ("Declaration",):
+        return elementos[0]
+
     elif lhs == "ForUpdate" and rhs == ("ID", "=", "E"):
         return _crear_asignacion(
             elementos[0],
