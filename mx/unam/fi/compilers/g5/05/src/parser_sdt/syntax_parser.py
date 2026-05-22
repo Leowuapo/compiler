@@ -150,7 +150,8 @@ def analizar(tokens):
 
         elif accion.startswith('R'):
             num_prod = int(accion[1:])
-            lhs, rhs = productions[num_prod]
+            produccion = productions[num_prod]
+            lhs, rhs = produccion
             cantidad = len(rhs)
 
             elementos = []
@@ -163,7 +164,7 @@ def analizar(tokens):
                 elementos_pos.insert(0, pila_pos.pop())
 
             try:
-                resultado = accion_semantica(num_prod, elementos, elementos_pos)
+                resultado = accion_semantica(produccion, elementos, elementos_pos)
 
             except Exception as e:
                 sdt_correcto = False

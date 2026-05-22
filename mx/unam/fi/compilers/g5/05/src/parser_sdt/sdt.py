@@ -388,131 +388,100 @@ def _validar_condicion(condicion):
     return valor, tipo
 
 
-def accion_semantica(num_prod, elementos, posiciones=None):
-    #print(f"[DEBUG SDT] Producción: {num_prod}, elementos: {elementos}")
+def accion_semantica(produccion, elementos, posiciones=None):
+    lhs, rhs = produccion
+    rhs = tuple(rhs)
 
-    if num_prod == 0:
+    # Programa
+    if lhs == "Program'" and rhs == ("Program",):
         return elementos[0]
-    elif num_prod == 1:
+
+    elif lhs == "Program" and rhs == ("StatementList",):
         return Nodo('PROGRAM', None, _normalizar_lista_sentencias(elementos[0]))
-    elif num_prod == 2:
+
+    # Lista de statements
+    elif lhs == "StatementList" and rhs == ("Statement",):
         return Nodo('STMT_LIST', None, _normalizar_lista_sentencias(elementos[0]))
-    elif num_prod == 3:
-        return Nodo('STMT_LIST', None, _normalizar_lista_sentencias(elementos[0]) + _normalizar_lista_sentencias(elementos[1]))
-    elif num_prod == 4:
+
+    elif lhs == "StatementList" and rhs == ("StatementList", "Statement"):
+        return Nodo(
+            'STMT_LIST',
+            None,
+            _normalizar_lista_sentencias(elementos[0]) +
+            _normalizar_lista_sentencias(elementos[1])
+        )
+
+    # Statements
+    elif lhs == "Statement" and rhs == ("Declaration", ";"):
         return elementos[0]
-    elif num_prod == 5:
+
+    elif lhs == "Statement" and rhs == ("Assignment", ";"):
         return elementos[0]
-    elif num_prod == 6:
+
+    elif lhs == "Statement" and rhs == ("Block",):
         return elementos[0]
-    elif num_prod == 7:
+
+    elif lhs == "Statement" and rhs == ("IfStatement",):
+        return elementos[0]
+
+    elif lhs == "Statement" and rhs == ("WhileStatement",):
+        return elementos[0]
+
+    # Declaración
+    elif lhs == "Declaration" and rhs == ("TYPE", "DeclList"):
         tipo_dato = normalizar_tipo(elementos[0], posiciones, 0)
         decl_items = elementos[1] if isinstance(elementos[1], list) else [elementos[1]]
         declaraciones = [_declarar_item(tipo_dato, item) for item in decl_items]
         linea, columna = _pos(posiciones, 0)
         return Nodo('DECL_LIST', tipo_dato, declaraciones, linea=linea, columna=columna)
-    elif num_prod == 8:
+
+    elif lhs == "DeclList" and rhs == ("DeclItem",):
         return [elementos[0]]
-    elif num_prod == 9:
+
+    elif lhs == "DeclList" and rhs == ("DeclList", ",", "DeclItem"):
         return elementos[0] + [elementos[2]]
-    elif num_prod == 10:
+
+    elif lhs == "DeclItem" and rhs == ("ID",):
         linea, columna = _pos(posiciones, 0)
         return Nodo('DECL_ITEM', elementos[0], linea=linea, columna=columna)
-    elif num_prod == 11:
+
+    elif lhs == "DeclItem" and rhs == ("ID", "=", "E"):
         linea, columna = _pos(posiciones, 0)
         return Nodo('DECL_ITEM', elementos[0], [elementos[2]], linea=linea, columna=columna)
-    elif num_prod == 12:
+
+    # Asignación
+    elif lhs == "Assignment" and rhs == ("ID", "=", "E"):
         nombre_var = elementos[0]
         expr_nodo = elementos[2]
+
         valor = evaluarexpresion(expr_nodo)
+
         ambito, _ = buscar_variable(nombre_var)
         if ambito is None:
             error_semantico(f"variable '{nombre_var}' not declared", posiciones, 0)
+
         ambito.asignar(nombre_var, valor, posiciones, 0)
+
         linea, columna = _pos(posiciones, 0)
         return Nodo('ASSIGN', nombre_var, [expr_nodo], linea=linea, columna=columna)
-    elif num_prod == 13:
+
+    # Bloques
+    elif lhs == "Block" and rhs == ("{", "StatementList", "}"):
         linea, columna = _pos(posiciones, 0)
-        return Nodo('BLOCK', None, _normalizar_lista_sentencias(elementos[1]), linea=linea, columna=columna)
-    elif num_prod == 14:
+        return Nodo(
+            'BLOCK',
+            None,
+            _normalizar_lista_sentencias(elementos[1]),
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "Block" and rhs == ("{", "}"):
         linea, columna = _pos(posiciones, 0)
         return Nodo('BLOCK', None, [], linea=linea, columna=columna)
-    
-    
-    # E -> OrExpr
-    elif num_prod == 15:
-        return elementos[0]
 
-    # OrExpr
-    elif num_prod == 16:
-        return _nodo_binario('||', elementos, posiciones)
-    elif num_prod == 17:
-        return elementos[0]
-
-    # AndExpr
-    elif num_prod == 18:
-        return _nodo_binario('&&', elementos, posiciones)
-    elif num_prod == 19:
-        return elementos[0]
-
-    # EqExpr
-    elif num_prod == 20:
-        return _nodo_binario('==', elementos, posiciones)
-    elif num_prod == 21:
-        return _nodo_binario('!=', elementos, posiciones)
-    elif num_prod == 22:
-        return elementos[0]
-
-    # RelExpr
-    elif num_prod == 23:
-        return _nodo_binario('<', elementos, posiciones)
-    elif num_prod == 24:
-        return _nodo_binario('>', elementos, posiciones)
-    elif num_prod == 25:
-        return _nodo_binario('<=', elementos, posiciones)
-    elif num_prod == 26:
-        return _nodo_binario('>=', elementos, posiciones)
-    elif num_prod == 27:
-        return elementos[0]
-
-    # AddExpr
-    elif num_prod == 28:
-        return _nodo_binario('+', elementos, posiciones)
-    elif num_prod == 29:
-        return _nodo_binario('-', elementos, posiciones)
-    elif num_prod == 30:
-        return elementos[0]
-
-    # MulExpr
-    elif num_prod == 31:
-        return _nodo_binario('*', elementos, posiciones)
-    elif num_prod == 32:
-        return _nodo_binario('/', elementos, posiciones)
-    elif num_prod == 33:
-        return elementos[0]
-
-    # UnaryExpr
-    elif num_prod == 34:
-        return _nodo_unario('!', elementos, posiciones)
-    elif num_prod == 35:
-        return elementos[0]
-
-    # Primary
-    elif num_prod == 36:
-        return elementos[1]
-    elif num_prod == 37:
-        linea, columna = _pos(posiciones, 0)
-        return Nodo('ID', elementos[0], linea=linea, columna=columna)
-    elif num_prod == 38:
-        linea, columna = _pos(posiciones, 0)
-        return Nodo('CONST', parsear_constante(elementos[0], posiciones, 0), linea=linea, columna=columna)
-    
-        # Statement -> IfStatement
-    elif num_prod == 39:
-        return elementos[0]
-
-    # IfStatement -> if ( E ) Block
-    elif num_prod == 40:
+    # If / else
+    elif lhs == "IfStatement" and rhs == ("if", "(", "E", ")", "Block"):
         condicion = elementos[2]
         bloque_then = elementos[4]
 
@@ -527,8 +496,7 @@ def accion_semantica(num_prod, elementos, posiciones=None):
             columna=columna
         )
 
-    # IfStatement -> if ( E ) Block else Block
-    elif num_prod == 41:
+    elif lhs == "IfStatement" and rhs == ("if", "(", "E", ")", "Block", "else", "Block"):
         condicion = elementos[2]
         bloque_then = elementos[4]
         bloque_else = elementos[6]
@@ -543,13 +511,9 @@ def accion_semantica(num_prod, elementos, posiciones=None):
             linea=linea,
             columna=columna
         )
-    
-    # Statement -> WhileStatement
-    elif num_prod == 42:
-        return elementos[0]
 
-    # WhileStatement -> while ( E ) Block
-    elif num_prod == 43:
+    # While
+    elif lhs == "WhileStatement" and rhs == ("while", "(", "E", ")", "Block"):
         condicion = elementos[2]
         bloque = elementos[4]
 
@@ -564,7 +528,66 @@ def accion_semantica(num_prod, elementos, posiciones=None):
             columna=columna
         )
 
-    return None
+    # Expresiones de paso directo
+    elif lhs == "E" and rhs == ("OrExpr",):
+        return elementos[0]
+
+    elif lhs == "OrExpr" and rhs == ("AndExpr",):
+        return elementos[0]
+
+    elif lhs == "AndExpr" and rhs == ("EqExpr",):
+        return elementos[0]
+
+    elif lhs == "EqExpr" and rhs == ("RelExpr",):
+        return elementos[0]
+
+    elif lhs == "RelExpr" and rhs == ("AddExpr",):
+        return elementos[0]
+
+    elif lhs == "AddExpr" and rhs == ("MulExpr",):
+        return elementos[0]
+
+    elif lhs == "MulExpr" and rhs == ("UnaryExpr",):
+        return elementos[0]
+
+    elif lhs == "UnaryExpr" and rhs == ("Primary",):
+        return elementos[0]
+
+    # Operadores binarios
+    elif len(rhs) == 3 and rhs[1] in {
+        '||', '&&',
+        '==', '!=',
+        '<', '>', '<=', '>=',
+        '+', '-', '*', '/'
+    }:
+        return _nodo_binario(rhs[1], elementos, posiciones)
+
+    # Operador unario
+    elif lhs == "UnaryExpr" and rhs == ("!", "UnaryExpr"):
+        return _nodo_unario('!', elementos, posiciones)
+
+    # Primary
+    elif lhs == "Primary" and rhs == ("(", "E", ")"):
+        return elementos[1]
+
+    elif lhs == "Primary" and rhs == ("ID",):
+        linea, columna = _pos(posiciones, 0)
+        return Nodo('ID', elementos[0], linea=linea, columna=columna)
+
+    elif lhs == "Primary" and rhs == ("CONST",):
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'CONST',
+            parsear_constante(elementos[0], posiciones, 0),
+            linea=linea,
+            columna=columna
+        )
+
+    error_semantico(
+        f"semantic action not implemented for production: {lhs} -> {' '.join(rhs)}",
+        posiciones,
+        0
+    )
 
 
 def imprimir_arbol(nodo, nivel=0):
