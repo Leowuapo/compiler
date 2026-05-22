@@ -17,6 +17,11 @@ def mapear_tokens(tokens):
             simbolos.append('TYPE')
             lexemas.append(valor)
             posiciones.append((linea, columna))
+        
+        elif tipo == 'keyword' and valor in {'if', 'else'}:
+            simbolos.append(valor)
+            lexemas.append(valor)
+            posiciones.append((linea, columna))
 
         elif tipo == 'identifier' and valor in {'true', 'false'}:
             simbolos.append('CONST')
