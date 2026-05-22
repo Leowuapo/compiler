@@ -67,11 +67,11 @@ productions = [
 
     # While
     ("Statement", ["WhileStatement"]),
-    ("WhileStatement", ["while", "(", "E", ")", "Block"]),
+    ("WhileStatement", ["while", "(", "E", ")", "EnterBreak", "Block", "ExitBreak"]),
 
     # For
     ("Statement", ["ForStatement"]),
-    ("ForStatement", ["for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "Block"]),
+    ("ForStatement", ["for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "EnterBreak", "Block", "ExitBreak"]),
     ("ForInit", ["ID", "=", "E"]),
     ("ForInit", ["Declaration"]),
     ("ForUpdate", ["ID", "=", "E"]),
@@ -80,9 +80,9 @@ productions = [
 
     # Switch
     ("Statement", ["SwitchStatement"]),
-    ("SwitchStatement", ["switch", "(", "E", ")", "{", "CaseList", "}"]),
-    ("SwitchStatement", ["switch", "(", "E", ")", "{", "CaseList", "DefaultItem", "}"]),
-    ("SwitchStatement", ["switch", "(", "E", ")", "{", "DefaultItem", "}"]),
+    ("SwitchStatement", ["switch", "(", "E", ")", "{", "EnterBreak", "CaseList", "}", "ExitBreak"]),
+    ("SwitchStatement", ["switch", "(", "E", ")", "{", "EnterBreak", "CaseList", "DefaultItem", "}", "ExitBreak"]),
+    ("SwitchStatement", ["switch", "(", "E", ")", "{", "EnterBreak", "DefaultItem", "}", "ExitBreak"]),
 
     ("CaseList", ["CaseItem"]),
     ("CaseList", ["CaseList", "CaseItem"]),
@@ -90,6 +90,13 @@ productions = [
     ("CaseItem", ["case", "CONST", ":", "Block"]),
 
     ("DefaultItem", ["default", ":", "Block"]),
+
+    # Break
+    ("Statement", ["BreakStatement", ";"]),
+    ("BreakStatement", ["break"]),
+    # Marcadores semánticos para contexto de break
+    ("EnterBreak", []),
+    ("ExitBreak", []),
 ]
 
 prod_num = {}
@@ -102,7 +109,8 @@ terminales = {
     "+", "-", "*", "/", "!",
     "++", "--",
     "if", "else", "while", "for",
-    "switch", "case", "default"
+    "switch", "case", "default",
+    "break"
 }
 
 no_terminales = {
@@ -112,7 +120,8 @@ no_terminales = {
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
     "IfStatement", "WhileStatement", 
     "ForStatement", "ForInit", "ForUpdate",
-    "SwitchStatement", "CaseList", "CaseItem", "DefaultItem"
+    "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",
+    "BreakStatement", "EnterBreak", "ExitBreak"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}

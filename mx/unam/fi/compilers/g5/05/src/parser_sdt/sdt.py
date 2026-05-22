@@ -76,12 +76,14 @@ class TablaSimbolos:
 
 tabla_simbolos = TablaSimbolos()
 ambito_pila = [tabla_simbolos]
+break_contexto = 0
 
 
 def reset_semantica():
-    global ambito_pila
+    global ambito_pila, break_contexto
     tabla_simbolos.limpiar()
     ambito_pila = [tabla_simbolos]
+    break_contexto = 0
 
 
 def entrar_ambito():
@@ -484,6 +486,22 @@ def _validar_switch(expr_switch, cases, default_item=None, posiciones=None):
         valores_vistos.add(valor_convertido)
 
 
+def entrar_break_contexto():
+    global break_contexto
+    break_contexto += 1
+
+
+def salir_break_contexto():
+    global break_contexto
+    if break_contexto > 0:
+        break_contexto -= 1
+
+
+def validar_break(posiciones=None):
+    if break_contexto <= 0:
+        error_semantico("'break' statement not within loop or switch", posiciones, 0)
+
+
 def accion_semantica(produccion, elementos, posiciones=None):
     lhs, rhs = produccion
     rhs = tuple(rhs)
@@ -602,9 +620,11 @@ def accion_semantica(produccion, elementos, posiciones=None):
         )
 
     # While
-    elif lhs == "WhileStatement" and rhs == ("while", "(", "E", ")", "Block"):
+    elif lhs == "WhileStatement" and rhs == (
+        "while", "(", "E", ")", "EnterBreak", "Block", "ExitBreak"
+    ):
         condicion = elementos[2]
-        bloque = elementos[4]
+        bloque = elementos[5]
 
         _validar_condicion(condicion)
 
@@ -622,12 +642,12 @@ def accion_semantica(produccion, elementos, posiciones=None):
         return elementos[0]
 
     elif lhs == "ForStatement" and rhs == (
-        "for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "Block"
+        "for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "EnterBreak", "Block", "ExitBreak"
     ):
         inicializacion = elementos[2]
         condicion = elementos[4]
         actualizacion = elementos[6]
-        bloque = elementos[8]
+        bloque = elementos[9]
 
         _validar_condicion(condicion)
 
@@ -680,10 +700,10 @@ def accion_semantica(produccion, elementos, posiciones=None):
         return elementos[0]
 
     elif lhs == "SwitchStatement" and rhs == (
-        "switch", "(", "E", ")", "{", "CaseList", "}"
+        "switch", "(", "E", ")", "{", "EnterBreak", "CaseList", "}", "ExitBreak"
     ):
         expr_switch = elementos[2]
-        cases = elementos[5]
+        cases = elementos[6]
         _validar_switch(expr_switch, cases, None, posiciones)
 
         linea, columna = _pos(posiciones, 0)
@@ -696,11 +716,11 @@ def accion_semantica(produccion, elementos, posiciones=None):
         )
 
     elif lhs == "SwitchStatement" and rhs == (
-        "switch", "(", "E", ")", "{", "CaseList", "DefaultItem", "}"
+        "switch", "(", "E", ")", "{", "EnterBreak", "CaseList", "DefaultItem", "}", "ExitBreak"
     ):
         expr_switch = elementos[2]
-        cases = elementos[5]
-        default_item = elementos[6]
+        cases = elementos[6]
+        default_item = elementos[7]
 
         _validar_switch(expr_switch, cases, default_item, posiciones)
 
@@ -714,10 +734,10 @@ def accion_semantica(produccion, elementos, posiciones=None):
         )
 
     elif lhs == "SwitchStatement" and rhs == (
-        "switch", "(", "E", ")", "{", "DefaultItem", "}"
+        "switch", "(", "E", ")", "{", "EnterBreak", "DefaultItem", "}", "ExitBreak"
     ):
         expr_switch = elementos[2]
-        default_item = elementos[5]
+        default_item = elementos[6]
 
         evaluarexpresion(expr_switch, con_tipo=True)
 
@@ -762,6 +782,33 @@ def accion_semantica(produccion, elementos, posiciones=None):
             'DEFAULT',
             None,
             [elementos[2]],
+            linea=linea,
+            columna=columna
+        )
+    
+
+    # Marcadores de break
+    elif lhs == "EnterBreak" and rhs == tuple():
+        entrar_break_contexto()
+        return None
+
+    elif lhs == "ExitBreak" and rhs == tuple():
+        salir_break_contexto()
+        return None
+    
+
+    # Break
+    elif lhs == "Statement" and rhs == ("BreakStatement", ";"):
+        return elementos[0]
+
+    elif lhs == "BreakStatement" and rhs == ("break",):
+        validar_break(posiciones)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'BREAK',
+            None,
+            [],
             linea=linea,
             columna=columna
         )
