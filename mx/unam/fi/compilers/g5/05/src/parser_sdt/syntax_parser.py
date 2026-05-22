@@ -18,7 +18,7 @@ def mapear_tokens(tokens):
             lexemas.append(valor)
             posiciones.append((linea, columna))
         
-        elif tipo == 'keyword' and valor in {'if', 'else'}:
+        elif tipo == 'keyword' and valor in {'if', 'else', 'while'}:
             simbolos.append(valor)
             lexemas.append(valor)
             posiciones.append((linea, columna))

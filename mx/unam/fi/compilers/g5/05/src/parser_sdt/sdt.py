@@ -543,6 +543,26 @@ def accion_semantica(num_prod, elementos, posiciones=None):
             linea=linea,
             columna=columna
         )
+    
+    # Statement -> WhileStatement
+    elif num_prod == 42:
+        return elementos[0]
+
+    # WhileStatement -> while ( E ) Block
+    elif num_prod == 43:
+        condicion = elementos[2]
+        bloque = elementos[4]
+
+        _validar_condicion(condicion)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'WHILE',
+            None,
+            [condicion, bloque],
+            linea=linea,
+            columna=columna
+        )
 
     return None
 
