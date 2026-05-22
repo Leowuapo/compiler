@@ -38,28 +38,12 @@ def mapear_tokens(tokens):
             lexemas.append(valor)
             posiciones.append((linea, columna))
 
-        elif tipo == 'operator' and valor == '=':
-            simbolos.append('=')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'operator' and valor == '+':
-            simbolos.append('+')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'operator' and valor == '-':
-            simbolos.append('-')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'operator' and valor == '*':
-            simbolos.append('*')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'operator' and valor == '/':
-            simbolos.append('/')
+        elif tipo == 'operator' and valor in {
+            '=', '+', '-', '*', '/',
+            '&&', '||', '!',
+            '==', '!=', '<', '>', '<=', '>='
+        }:
+            simbolos.append(valor)
             lexemas.append(valor)
             posiciones.append((linea, columna))
 
@@ -183,7 +167,7 @@ def analizar(tokens):
 
             pila_sem.append(resultado)
             pila_pos.append(elementos_pos[0] if elementos_pos else (None, None))
-            
+
             estado_expuesto = pila[-1]
 
             if lhs not in tabla_goto.get(estado_expuesto, {}):
