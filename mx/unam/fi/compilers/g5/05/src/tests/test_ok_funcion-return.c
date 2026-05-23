@@ -1,12 +1,7 @@
 int f() {
-    return 5;
-}
+    if (true) {
+        return 1;
+    }
 
-void g() {
-    return;
-}
-
-int h() {
     int x = 2;
-    return x + 3;
 }

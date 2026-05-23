@@ -943,6 +943,24 @@ def tipo_compatible_printf(especificador, tipo):
     return False
 
 
+def validar_funcion_retorno(header):
+    if header is None:
+        return
+
+    tipo_retorno = header['tipo_retorno']
+
+    if tipo_retorno != "void" and not header.get('tiene_return', False):
+        error_semantico(
+            f"function '{header['nombre']}' must return a value of type '{tipo_retorno}'",
+            nodo=Nodo(
+                'FUNCTION',
+                header['nombre'],
+                linea=header['linea'],
+                columna=header['columna']
+            )
+        )
+
+
 def accion_semantica(produccion, elementos, posiciones=None):
     global funcion_pendiente
     
@@ -1434,6 +1452,8 @@ def accion_semantica(produccion, elementos, posiciones=None):
 
         if header is None:
             return None
+
+        validar_funcion_retorno(header)
 
         params_nodos = [
             Nodo(
