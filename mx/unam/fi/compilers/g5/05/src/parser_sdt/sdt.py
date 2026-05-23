@@ -97,15 +97,39 @@ class TablaFunciones:
     def limpiar(self):
         self.funciones = {}
 
-    def declarar(self, nombre, tipo_retorno, posiciones=None, indice=0):
+    def declarar(self, nombre, tipo_retorno, parametros=None, posiciones=None, indice=0):
         tipo_retorno = normalizar_tipo(tipo_retorno, posiciones, indice)
+
+        if parametros is None:
+            parametros = []
 
         if nombre in self.funciones:
             error_semantico(f"function '{nombre}' already declared", posiciones, indice)
 
+        nombres_param = set()
+
+        for param in parametros:
+            tipo_param = normalizar_tipo(param['tipo'], posiciones, indice)
+
+            if tipo_param == "void":
+                error_semantico(
+                    f"parameter '{param['nombre']}' cannot be void",
+                    posiciones,
+                    indice
+                )
+
+            if param['nombre'] in nombres_param:
+                error_semantico(
+                    f"duplicate parameter '{param['nombre']}' in function '{nombre}'",
+                    posiciones,
+                    indice
+                )
+
+            nombres_param.add(param['nombre'])
+
         self.funciones[nombre] = {
             'tipo_retorno': tipo_retorno,
-            'parametros': []
+            'parametros': parametros
         }
 
     def obtener(self, nombre, posiciones=None, indice=0):
@@ -116,9 +140,14 @@ class TablaFunciones:
 
     def mostrar(self):
         for nombre, datos in self.funciones.items():
+            params = ", ".join(
+                f"{p['tipo']} {p['nombre']}"
+                for p in datos['parametros']
+            )
+
             print(
                 f"{nombre} -> return type: {datos['tipo_retorno']}, "
-                f"params: ()"
+                f"params: ({params})"
             )
 
 
@@ -733,7 +762,30 @@ def validar_return(expr_nodo=None, posiciones=None):
     return expr_nodo
 
 
+def declarar_parametros_funcion_actual(posiciones=None):
+    funcion_actual = obtener_funcion_actual()
+
+    if funcion_actual is None:
+        return
+
+    tabla_actual = obtener_tabla_actual()
+
+    for param in funcion_actual['parametros']:
+        nombre = param['nombre']
+        tipo = param['tipo']
+
+        tabla_actual.declarar(nombre, tipo, posiciones, 0)
+        tabla_actual.asignar(
+            nombre,
+            ValorDesconocido(tipo, f"param {nombre}"),
+            posiciones,
+            0
+        )
+
+
 def accion_semantica(produccion, elementos, posiciones=None):
+    global funcion_pendiente
+    
     lhs, rhs = produccion
     rhs = tuple(rhs)
 
@@ -1139,18 +1191,40 @@ def accion_semantica(produccion, elementos, posiciones=None):
     
     # Funciones
     elif lhs == "FunctionHeader" and rhs == ("TYPE", "ID", "(", ")"):
-        global funcion_pendiente
-
         tipo_retorno = normalizar_tipo(elementos[0], posiciones, 0)
         nombre_funcion = elementos[1]
+        parametros = []
 
-        tabla_funciones.declarar(nombre_funcion, tipo_retorno, posiciones, 1)
+        tabla_funciones.declarar(nombre_funcion, tipo_retorno, parametros, posiciones, 1)
 
         linea, columna = _pos(posiciones, 1)
 
         header = {
             'nombre': nombre_funcion,
             'tipo_retorno': tipo_retorno,
+            'parametros': parametros,
+            'linea': linea,
+            'columna': columna,
+            'tiene_return': False
+        }
+
+        funcion_pendiente = header
+
+        return header
+
+    elif lhs == "FunctionHeader" and rhs == ("TYPE", "ID", "(", "ParamList", ")"):
+        tipo_retorno = normalizar_tipo(elementos[0], posiciones, 0)
+        nombre_funcion = elementos[1]
+        parametros = elementos[3]
+
+        tabla_funciones.declarar(nombre_funcion, tipo_retorno, parametros, posiciones, 1)
+
+        linea, columna = _pos(posiciones, 1)
+
+        header = {
+            'nombre': nombre_funcion,
+            'tipo_retorno': tipo_retorno,
+            'parametros': parametros,
             'linea': linea,
             'columna': columna,
             'tiene_return': False
@@ -1167,9 +1241,33 @@ def accion_semantica(produccion, elementos, posiciones=None):
     elif lhs == "ExitFunction" and rhs == tuple():
         salir_funcion_contexto()
         return None
+    
+    elif lhs == "EnterParams" and rhs == tuple():
+        declarar_parametros_funcion_actual(posiciones)
+        return None
+
+    elif lhs == "FunctionBody" and rhs == ("{", "EnterParams", "StatementList", "}"):
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'BLOCK',
+            None,
+            _normalizar_lista_sentencias(elementos[2]),
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "FunctionBody" and rhs == ("{", "EnterParams", "}"):
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'BLOCK',
+            None,
+            [],
+            linea=linea,
+            columna=columna
+        )
 
     elif lhs == "FunctionDecl" and rhs == (
-        "FunctionHeader", "EnterFunction", "Block", "ExitFunction"
+        "FunctionHeader", "EnterFunction", "FunctionBody", "ExitFunction"
     ):
         header = elementos[0]
         bloque = elementos[2]
@@ -1177,11 +1275,21 @@ def accion_semantica(produccion, elementos, posiciones=None):
         if header is None:
             return None
 
+        params_nodos = [
+            Nodo(
+                'PARAM',
+                param['nombre'],
+                [Nodo('TYPE', param['tipo'])]
+            )
+            for param in header['parametros']
+        ]
+
         return Nodo(
             'FUNCTION',
             header['nombre'],
             [
                 Nodo('RETURN_TYPE', header['tipo_retorno']),
+                Nodo('PARAMS', None, params_nodos),
                 bloque
             ],
             linea=header['linea'],
@@ -1227,9 +1335,9 @@ def accion_semantica(produccion, elementos, posiciones=None):
 
         info_funcion = tabla_funciones.obtener(nombre_funcion, posiciones, 0)
 
-        if info_funcion['parametros']:
+        if len(info_funcion['parametros']) != 0:
             error_semantico(
-                f"function '{nombre_funcion}' expects arguments",
+                f"function '{nombre_funcion}' expects {len(info_funcion['parametros'])} argument(s), got 0",
                 posiciones,
                 0
             )
@@ -1243,6 +1351,71 @@ def accion_semantica(produccion, elementos, posiciones=None):
             linea=linea,
             columna=columna
         )
+
+    elif lhs == "FunctionCall" and rhs == ("ID", "(", "ArgList", ")"):
+        nombre_funcion = elementos[0]
+        argumentos = elementos[2]
+
+        info_funcion = tabla_funciones.obtener(nombre_funcion, posiciones, 0)
+        parametros = info_funcion['parametros']
+
+        if len(argumentos) != len(parametros):
+            error_semantico(
+                f"function '{nombre_funcion}' expects {len(parametros)} argument(s), got {len(argumentos)}",
+                posiciones,
+                0
+            )
+
+        for indice, (arg_nodo, param) in enumerate(zip(argumentos, parametros)):
+            valor_arg, tipo_arg = evaluarexpresion(arg_nodo, con_tipo=True)
+
+            convertir_a_tipo(
+                valor_arg,
+                param['tipo'],
+                f"argument {indice + 1} of function '{nombre_funcion}'",
+                posiciones,
+                0,
+                nodo=arg_nodo
+            )
+
+        linea, columna = _pos(posiciones, 0)
+
+        return Nodo(
+            'CALL',
+            nombre_funcion,
+            argumentos,
+            linea=linea,
+            columna=columna
+        )
+    
+    # Parámetros de función
+    elif lhs == "Param" and rhs == ("TYPE", "ID"):
+        tipo_param = normalizar_tipo(elementos[0], posiciones, 0)
+
+        if tipo_param == "void":
+            error_semantico(
+                f"parameter '{elementos[1]}' cannot be void",
+                posiciones,
+                0
+            )
+
+        return {
+            'tipo': tipo_param,
+            'nombre': elementos[1]
+        }
+
+    elif lhs == "ParamList" and rhs == ("Param",):
+        return [elementos[0]]
+
+    elif lhs == "ParamList" and rhs == ("ParamList", ",", "Param"):
+        return elementos[0] + [elementos[2]]
+    
+    # Argumentos de función (en llamadas)
+    elif lhs == "ArgList" and rhs == ("E",):
+        return [elementos[0]]
+
+    elif lhs == "ArgList" and rhs == ("ArgList", ",", "E"):
+        return elementos[0] + [elementos[2]]
 
     error_semantico(
         f"semantic action not implemented for production: {lhs} -> {' '.join(rhs)}",

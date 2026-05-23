@@ -115,13 +115,24 @@ productions = [
     ("EnterLoop", []),
     ("ExitLoop", []),
 
-    # Funciones básicas sin parámetros
-    ("FunctionDecl", ["FunctionHeader", "EnterFunction", "Block", "ExitFunction"]),
+    # Funciones
+    ("FunctionDecl", ["FunctionHeader", "EnterFunction", "FunctionBody", "ExitFunction"]),
+
     ("FunctionHeader", ["TYPE", "ID", "(", ")"]),
+    ("FunctionHeader", ["TYPE", "ID", "(", "ParamList", ")"]),
+
+    ("ParamList", ["Param"]),
+    ("ParamList", ["ParamList", ",", "Param"]),
+
+    ("Param", ["TYPE", "ID"]),
+
+    ("FunctionBody", ["{", "EnterParams", "StatementList", "}"]),
+    ("FunctionBody", ["{", "EnterParams", "}"]),
 
     # Marcadores semánticos de función
     ("EnterFunction", []),
     ("ExitFunction", []),
+    ("EnterParams", []),
 
     # Return
     ("Statement", ["ReturnStatement", ";"]),
@@ -131,6 +142,10 @@ productions = [
     # Llamadas a funciones sin argumentos como statement
     ("Statement", ["FunctionCall", ";"]),
     ("FunctionCall", ["ID", "(", ")"]),
+    ("FunctionCall", ["ID", "(", "ArgList", ")"]),
+
+    ("ArgList", ["E"]),
+    ("ArgList", ["ArgList", ",", "E"]),
 ]
 
 prod_num = {}
@@ -158,9 +173,10 @@ no_terminales = {
     "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",
     "BreakStatement", "EnterBreak", "ExitBreak",
     "ContinueStatement", "EnterLoop", "ExitLoop",
-    "FunctionDecl", "FunctionHeader", "EnterFunction", "ExitFunction",
-    "ReturnStatement",
-    "FunctionCall"
+    "FunctionDecl", "FunctionHeader", "FunctionBody",
+    "EnterFunction", "ExitFunction", "EnterParams",
+    "ParamList", "Param",
+    "ReturnStatement", "FunctionCall", "ArgList"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}
