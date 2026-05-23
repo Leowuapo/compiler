@@ -10,6 +10,17 @@ class Nodo:
         return f"Nodo({self.tipo}, {self.valor}, {self.hijos})"
 
 
+class ValorDesconocido:
+    def __init__(self, tipo, descripcion=None):
+        self.tipo = tipo
+        self.descripcion = descripcion
+
+    def __repr__(self):
+        if self.descripcion:
+            return f"<unknown:{self.tipo}:{self.descripcion}>"
+        return f"<unknown:{self.tipo}>"
+
+
 ENTEROS = {"int", "long", "short", "unsigned"}
 REALES = {"float", "double"}
 VALID_TYPES = ENTEROS | REALES | {"char", "bool", "void"}
@@ -23,7 +34,13 @@ RANGOS = {
 
 
 def formatear_valor(valor):
+    if es_valor_desconocido(valor):
+        return repr(valor)
     return repr(valor) if isinstance(valor, str) else valor
+
+
+def es_valor_desconocido(valor):
+    return isinstance(valor, ValorDesconocido)
 
 
 def error_semantico(mensaje, posiciones=None, indice=0, nodo=None):
@@ -173,6 +190,8 @@ def inferir_tipo_constante(valor, nodo=None):
 
 
 def valor_numerico(valor):
+    if es_valor_desconocido(valor):
+        return valor
     if isinstance(valor, bool):
         return 1 if valor else 0
     if isinstance(valor, str) and len(valor) == 1:
@@ -184,9 +203,45 @@ def valor_booleano(valor):
     return bool(valor_numerico(valor))
 
 
+def tipos_convertibles(tipo_origen, tipo_destino):
+    tipo_origen = normalizar_tipo(tipo_origen)
+    tipo_destino = normalizar_tipo(tipo_destino)
+
+    if tipo_destino == "void" or tipo_origen == "void":
+        return tipo_origen == tipo_destino
+
+    if tipo_origen == tipo_destino:
+        return True
+
+    if tipo_destino == "bool":
+        return tipo_origen in ENTEROS | REALES | {"char", "bool"}
+
+    if tipo_destino == "char":
+        return tipo_origen in ENTEROS | {"char", "bool"}
+
+    if tipo_destino in ENTEROS:
+        return tipo_origen in ENTEROS | {"char", "bool"}
+
+    if tipo_destino in REALES:
+        return tipo_origen in ENTEROS | REALES | {"char", "bool"}
+
+    return False
+
+
 def convertir_a_tipo(valor, tipo_destino, nombre_var=None, posiciones=None, indice=0, nodo=None):
     tipo_destino = normalizar_tipo(tipo_destino, posiciones, indice)
     etiqueta = f" for variable '{nombre_var}'" if nombre_var else ""
+
+    if es_valor_desconocido(valor):
+        if not tipos_convertibles(valor.tipo, tipo_destino):
+            error_semantico(
+                f"cannot convert value of type '{valor.tipo}' to '{tipo_destino}'{etiqueta}",
+                posiciones,
+                indice,
+                nodo,
+            )
+
+        return ValorDesconocido(tipo_destino, valor.descripcion)
 
     if tipo_destino == "bool":
         if isinstance(valor, str) and len(valor) == 1:
@@ -273,19 +328,44 @@ def evaluar_con_tipo(nodo):
         if var_info['valor'] is None:
             error_semantico(f"variable '{nodo.valor}' used before initialization", nodo=nodo)
         return var_info['valor'], var_info['tipo']
+    
+    if nodo.tipo == 'CALL':
+        info_funcion = tabla_funciones.obtener(nodo.valor)
+
+        tipo_retorno = info_funcion['tipo_retorno']
+
+        if tipo_retorno == "void":
+            error_semantico(
+                f"void function '{nodo.valor}' cannot be used as an expression",
+                nodo=nodo
+            )
+
+        return ValorDesconocido(tipo_retorno, f"call {nodo.valor}"), tipo_retorno
 
     if nodo.tipo == '!':
         valor, _ = evaluar_con_tipo(nodo.hijos[0])
+
+        if es_valor_desconocido(valor):
+            return ValorDesconocido("bool", f"!{valor.descripcion}"), "bool"
+
         return not valor_booleano(valor), "bool"
 
     if nodo.tipo == '&&':
         izq, _ = evaluar_con_tipo(nodo.hijos[0])
         der, _ = evaluar_con_tipo(nodo.hijos[1])
+
+        if es_valor_desconocido(izq) or es_valor_desconocido(der):
+            return ValorDesconocido("bool", "logical &&"), "bool"
+
         return valor_booleano(izq) and valor_booleano(der), "bool"
 
     if nodo.tipo == '||':
         izq, _ = evaluar_con_tipo(nodo.hijos[0])
         der, _ = evaluar_con_tipo(nodo.hijos[1])
+
+        if es_valor_desconocido(izq) or es_valor_desconocido(der):
+            return ValorDesconocido("bool", "logical ||"), "bool"
+
         return valor_booleano(izq) or valor_booleano(der), "bool"
 
     if nodo.tipo in {'==', '!=', '<', '>', '<=', '>='}:
@@ -294,6 +374,9 @@ def evaluar_con_tipo(nodo):
 
         izq_val = valor_numerico(izq)
         der_val = valor_numerico(der)
+
+        if es_valor_desconocido(izq_val) or es_valor_desconocido(der_val):
+            return ValorDesconocido("bool", f"comparison {nodo.tipo}"), "bool"
 
         if nodo.tipo == '==':
             return izq_val == der_val, "bool"
@@ -316,6 +399,9 @@ def evaluar_con_tipo(nodo):
         der_num = valor_numerico(der)
 
         tipo_res = tipo_aritmetico(tipo_izq, tipo_der, nodo.tipo)
+
+        if es_valor_desconocido(izq_num) or es_valor_desconocido(der_num):
+            return ValorDesconocido(tipo_res, f"arithmetic {nodo.tipo}"), tipo_res
 
         if nodo.tipo == '+':
             valor = izq_num + der_num
@@ -1047,6 +1133,9 @@ def accion_semantica(produccion, elementos, posiciones=None):
             linea=linea,
             columna=columna
         )
+    
+    elif lhs == "Primary" and rhs == ("FunctionCall",):
+        return elementos[0]
     
     # Funciones
     elif lhs == "FunctionHeader" and rhs == ("TYPE", "ID", "(", ")"):

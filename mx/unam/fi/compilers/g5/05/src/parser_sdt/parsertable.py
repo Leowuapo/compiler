@@ -66,6 +66,7 @@ productions = [
     ("Primary", ["(", "E", ")"]),
     ("Primary", ["ID"]),
     ("Primary", ["CONST"]),
+    ("Primary", ["FunctionCall"]),
 
     # If / else
     ("Statement", ["IfStatement"]),
