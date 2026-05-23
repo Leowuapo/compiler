@@ -67,11 +67,11 @@ productions = [
 
     # While
     ("Statement", ["WhileStatement"]),
-    ("WhileStatement", ["while", "(", "E", ")", "EnterBreak", "Block", "ExitBreak"]),
+    ("WhileStatement", ["while", "(", "E", ")", "EnterBreak", "EnterLoop", "Block", "ExitLoop", "ExitBreak"]),
 
     # For
     ("Statement", ["ForStatement"]),
-    ("ForStatement", ["for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "EnterBreak", "Block", "ExitBreak"]),
+    ("ForStatement", ["for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "EnterBreak", "EnterLoop", "Block", "ExitLoop", "ExitBreak"]),
     ("ForInit", ["ID", "=", "E"]),
     ("ForInit", ["Declaration"]),
     ("ForUpdate", ["ID", "=", "E"]),
@@ -94,9 +94,18 @@ productions = [
     # Break
     ("Statement", ["BreakStatement", ";"]),
     ("BreakStatement", ["break"]),
+
     # Marcadores semánticos para contexto de break
     ("EnterBreak", []),
     ("ExitBreak", []),
+
+    # Continue
+    ("Statement", ["ContinueStatement", ";"]),
+    ("ContinueStatement", ["continue"]),
+
+    # Marcadores semánticos para contexto de loop
+    ("EnterLoop", []),
+    ("ExitLoop", []),
 ]
 
 prod_num = {}
@@ -110,7 +119,7 @@ terminales = {
     "++", "--",
     "if", "else", "while", "for",
     "switch", "case", "default",
-    "break"
+    "break", "continue"
 }
 
 no_terminales = {
@@ -121,7 +130,8 @@ no_terminales = {
     "IfStatement", "WhileStatement", 
     "ForStatement", "ForInit", "ForUpdate",
     "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",
-    "BreakStatement", "EnterBreak", "ExitBreak"
+    "BreakStatement", "EnterBreak", "ExitBreak",
+    "ContinueStatement", "EnterLoop", "ExitLoop"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}

@@ -21,7 +21,7 @@ def mapear_tokens(tokens):
         elif tipo == 'keyword' and valor in {
             'if', 'else', 'while', 'for',
             'switch', 'case', 'default',
-            'break'
+            'break', 'continue'
         }:
             simbolos.append(valor)
             lexemas.append(valor)

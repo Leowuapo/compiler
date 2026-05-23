@@ -77,13 +77,15 @@ class TablaSimbolos:
 tabla_simbolos = TablaSimbolos()
 ambito_pila = [tabla_simbolos]
 break_contexto = 0
+loop_contexto = 0
 
 
 def reset_semantica():
-    global ambito_pila, break_contexto
+    global ambito_pila, break_contexto, loop_contexto
     tabla_simbolos.limpiar()
     ambito_pila = [tabla_simbolos]
     break_contexto = 0
+    loop_contexto = 0
 
 
 def entrar_ambito():
@@ -502,6 +504,21 @@ def validar_break(posiciones=None):
         error_semantico("'break' statement not within loop or switch", posiciones, 0)
 
 
+def entrar_loop_contexto():
+    global loop_contexto
+    loop_contexto += 1
+
+
+def salir_loop_contexto():
+    global loop_contexto
+    if loop_contexto > 0:
+        loop_contexto -= 1
+
+
+def validar_continue(posiciones=None):
+    if loop_contexto <= 0:
+        error_semantico("'continue' statement not within loop", posiciones, 0)
+
 def accion_semantica(produccion, elementos, posiciones=None):
     lhs, rhs = produccion
     rhs = tuple(rhs)
@@ -621,10 +638,10 @@ def accion_semantica(produccion, elementos, posiciones=None):
 
     # While
     elif lhs == "WhileStatement" and rhs == (
-        "while", "(", "E", ")", "EnterBreak", "Block", "ExitBreak"
+        "while", "(", "E", ")", "EnterBreak", "EnterLoop", "Block", "ExitLoop", "ExitBreak"
     ):
         condicion = elementos[2]
-        bloque = elementos[5]
+        bloque = elementos[6]
 
         _validar_condicion(condicion)
 
@@ -642,12 +659,12 @@ def accion_semantica(produccion, elementos, posiciones=None):
         return elementos[0]
 
     elif lhs == "ForStatement" and rhs == (
-        "for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "EnterBreak", "Block", "ExitBreak"
+        "for", "(", "ForInit", ";", "E", ";", "ForUpdate", ")", "EnterBreak", "EnterLoop", "Block", "ExitLoop", "ExitBreak"
     ):
         inicializacion = elementos[2]
         condicion = elementos[4]
         actualizacion = elementos[6]
-        bloque = elementos[9]
+        bloque = elementos[10]
 
         _validar_condicion(condicion)
 
@@ -785,7 +802,6 @@ def accion_semantica(produccion, elementos, posiciones=None):
             linea=linea,
             columna=columna
         )
-    
 
     # Marcadores de break
     elif lhs == "EnterBreak" and rhs == tuple():
@@ -795,7 +811,6 @@ def accion_semantica(produccion, elementos, posiciones=None):
     elif lhs == "ExitBreak" and rhs == tuple():
         salir_break_contexto()
         return None
-    
 
     # Break
     elif lhs == "Statement" and rhs == ("BreakStatement", ";"):
@@ -807,6 +822,31 @@ def accion_semantica(produccion, elementos, posiciones=None):
         linea, columna = _pos(posiciones, 0)
         return Nodo(
             'BREAK',
+            None,
+            [],
+            linea=linea,
+            columna=columna
+        )
+    
+    #Marcadores de loop
+    elif lhs == "EnterLoop" and rhs == tuple():
+        entrar_loop_contexto()
+        return None
+
+    elif lhs == "ExitLoop" and rhs == tuple():
+        salir_loop_contexto()
+        return None
+    
+    # Continue
+    elif lhs == "Statement" and rhs == ("ContinueStatement", ";"):
+        return elementos[0]
+
+    elif lhs == "ContinueStatement" and rhs == ("continue",):
+        validar_continue(posiciones)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'CONTINUE',
             None,
             [],
             linea=linea,
