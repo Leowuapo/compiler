@@ -1,5 +1,5 @@
 from .parsertable import tabla_action, tabla_goto, productions
-from .sdt import tabla_simbolos, accion_semantica, imprimir_arbol, exportar_arbol_graphviz, reset_semantica, entrar_ambito, salir_ambito
+from .sdt import tabla_simbolos, tabla_funciones, accion_semantica, imprimir_arbol, exportar_arbol_graphviz, reset_semantica, entrar_ambito, salir_ambito
 import traceback
 
 def mapear_tokens(tokens):
@@ -17,11 +17,16 @@ def mapear_tokens(tokens):
             simbolos.append('TYPE')
             lexemas.append(valor)
             posiciones.append((linea, columna))
+
+        elif tipo == 'keyword' and valor == 'main':
+            simbolos.append('ID')
+            lexemas.append(valor)
+            posiciones.append((linea, columna))
         
         elif tipo == 'keyword' and valor in {
             'if', 'else', 'while', 'for',
             'switch', 'case', 'default',
-            'break', 'continue'
+            'break', 'continue', 'return'
         }:
             simbolos.append(valor)
             lexemas.append(valor)
@@ -177,8 +182,10 @@ def analizar(tokens):
                 resultado = accion_semantica(produccion, elementos, elementos_pos)
 
             except Exception as e:
+                if sdt_correcto:
+                    sdt_error = str(e)
+
                 sdt_correcto = False
-                sdt_error = str(e)
                 resultado = None
 
             pila_sem.append(resultado)
@@ -203,6 +210,9 @@ def analizar(tokens):
                 
                 print("Symbol table:")
                 tabla_simbolos.mostrar()
+
+                print("Function table:")
+                tabla_funciones.mostrar()
 
                 print("Parse/AST tree:")
                 imprimir_arbol(pila_sem[-1])

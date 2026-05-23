@@ -73,19 +73,59 @@ class TablaSimbolos:
         for nombre, datos in self.simbolos.items():
             print(f"{nombre} -> type: {datos['tipo']}, value: {formatear_valor(datos['valor'])}")
 
+class TablaFunciones:
+    def __init__(self):
+        self.funciones = {}
 
+    def limpiar(self):
+        self.funciones = {}
+
+    def declarar(self, nombre, tipo_retorno, posiciones=None, indice=0):
+        tipo_retorno = normalizar_tipo(tipo_retorno, posiciones, indice)
+
+        if nombre in self.funciones:
+            error_semantico(f"function '{nombre}' already declared", posiciones, indice)
+
+        self.funciones[nombre] = {
+            'tipo_retorno': tipo_retorno,
+            'parametros': []
+        }
+
+    def mostrar(self):
+        for nombre, datos in self.funciones.items():
+            print(
+                f"{nombre} -> return type: {datos['tipo_retorno']}, "
+                f"params: ()"
+            )
+
+
+# Contexto global para semántica
 tabla_simbolos = TablaSimbolos()
+tabla_funciones = TablaFunciones()
 ambito_pila = [tabla_simbolos]
+
 break_contexto = 0
 loop_contexto = 0
 
+snapshots_funcion = []
+funcion_pendiente = None
+funcion_contexto_pila = []
 
 def reset_semantica():
     global ambito_pila, break_contexto, loop_contexto
+    global snapshots_funcion, funcion_pendiente, funcion_contexto_pila
+
     tabla_simbolos.limpiar()
+    tabla_funciones.limpiar()
+
     ambito_pila = [tabla_simbolos]
+
     break_contexto = 0
     loop_contexto = 0
+
+    snapshots_funcion = []
+    funcion_pendiente = None
+    funcion_contexto_pila = []
 
 
 def entrar_ambito():
@@ -94,7 +134,7 @@ def entrar_ambito():
 
 def salir_ambito():
     if len(ambito_pila) > 1:
-        ambito_pila.pop()
+        ambito_pila.pop() 
 
 
 def obtener_tabla_actual():
@@ -519,6 +559,88 @@ def validar_continue(posiciones=None):
     if loop_contexto <= 0:
         error_semantico("'continue' statement not within loop", posiciones, 0)
 
+
+def _snapshot_ambitos():
+    return [
+        {nombre: datos.copy() for nombre, datos in ambito.simbolos.items()}
+        for ambito in ambito_pila
+    ]
+
+
+def entrar_funcion_contexto():
+    global funcion_pendiente
+
+    snapshots_funcion.append(_snapshot_ambitos())
+
+    if funcion_pendiente is not None:
+        funcion_contexto_pila.append(funcion_pendiente)
+        funcion_pendiente = None
+    else:
+        funcion_contexto_pila.append(None)
+
+
+def salir_funcion_contexto():
+    if funcion_contexto_pila:
+        funcion_contexto_pila.pop()
+
+    if not snapshots_funcion:
+        return
+
+    snapshot = snapshots_funcion.pop()
+
+    for ambito, simbolos_guardados in zip(ambito_pila, snapshot):
+        ambito.simbolos = {
+            nombre: datos.copy()
+            for nombre, datos in simbolos_guardados.items()
+        }
+
+
+def obtener_funcion_actual():
+    if not funcion_contexto_pila:
+        return None
+    return funcion_contexto_pila[-1]
+
+
+def validar_return(expr_nodo=None, posiciones=None):
+    funcion_actual = obtener_funcion_actual()
+
+    if funcion_actual is None:
+        error_semantico("'return' statement not within function", posiciones, 0)
+
+    tipo_retorno = funcion_actual['tipo_retorno']
+    funcion_actual['tiene_return'] = True
+
+    if expr_nodo is None:
+        if tipo_retorno != "void":
+            error_semantico(
+                f"function '{funcion_actual['nombre']}' must return a value of type '{tipo_retorno}'",
+                posiciones,
+                0
+            )
+
+        return None
+
+    if tipo_retorno == "void":
+        error_semantico(
+            f"void function '{funcion_actual['nombre']}' should not return a value",
+            posiciones,
+            0
+        )
+
+    valor, _ = evaluarexpresion(expr_nodo, con_tipo=True)
+
+    convertir_a_tipo(
+        valor,
+        tipo_retorno,
+        f"return of function '{funcion_actual['nombre']}'",
+        posiciones,
+        0,
+        nodo=expr_nodo
+    )
+
+    return expr_nodo
+
+
 def accion_semantica(produccion, elementos, posiciones=None):
     lhs, rhs = produccion
     rhs = tuple(rhs)
@@ -527,8 +649,8 @@ def accion_semantica(produccion, elementos, posiciones=None):
     if lhs == "Program'" and rhs == ("Program",):
         return elementos[0]
 
-    elif lhs == "Program" and rhs == ("StatementList",):
-        return Nodo('PROGRAM', None, _normalizar_lista_sentencias(elementos[0]))
+    elif lhs == "Program" and rhs == ("TopLevelList",):
+        return Nodo('PROGRAM', None, elementos[0])
 
     # Lista de statements
     elif lhs == "StatementList" and rhs == ("Statement",):
@@ -541,6 +663,18 @@ def accion_semantica(produccion, elementos, posiciones=None):
             _normalizar_lista_sentencias(elementos[0]) +
             _normalizar_lista_sentencias(elementos[1])
         )
+    
+    elif lhs == "TopLevelList" and rhs == ("TopLevel",):
+        return [elementos[0]]
+
+    elif lhs == "TopLevelList" and rhs == ("TopLevelList", "TopLevel"):
+        return elementos[0] + [elementos[1]]
+
+    elif lhs == "TopLevel" and rhs == ("Statement",):
+        return elementos[0]
+
+    elif lhs == "TopLevel" and rhs == ("FunctionDecl",):
+        return elementos[0]
 
     # Statements
     elif lhs == "Statement" and rhs == ("Declaration", ";"):
@@ -904,6 +1038,87 @@ def accion_semantica(produccion, elementos, posiciones=None):
         return Nodo(
             'CONST',
             parsear_constante(elementos[0], posiciones, 0),
+            linea=linea,
+            columna=columna
+        )
+    
+    # Funciones
+    elif lhs == "FunctionHeader" and rhs == ("TYPE", "ID", "(", ")"):
+        global funcion_pendiente
+
+        tipo_retorno = normalizar_tipo(elementos[0], posiciones, 0)
+        nombre_funcion = elementos[1]
+
+        tabla_funciones.declarar(nombre_funcion, tipo_retorno, posiciones, 1)
+
+        linea, columna = _pos(posiciones, 1)
+
+        header = {
+            'nombre': nombre_funcion,
+            'tipo_retorno': tipo_retorno,
+            'linea': linea,
+            'columna': columna,
+            'tiene_return': False
+        }
+
+        funcion_pendiente = header
+
+        return header
+
+    elif lhs == "EnterFunction" and rhs == tuple():
+        entrar_funcion_contexto()
+        return None
+
+    elif lhs == "ExitFunction" and rhs == tuple():
+        salir_funcion_contexto()
+        return None
+
+    elif lhs == "FunctionDecl" and rhs == (
+        "FunctionHeader", "EnterFunction", "Block", "ExitFunction"
+    ):
+        header = elementos[0]
+        bloque = elementos[2]
+
+        if header is None:
+            return None
+
+        return Nodo(
+            'FUNCTION',
+            header['nombre'],
+            [
+                Nodo('RETURN_TYPE', header['tipo_retorno']),
+                bloque
+            ],
+            linea=header['linea'],
+            columna=header['columna']
+        )
+    
+    # Return
+    elif lhs == "Statement" and rhs == ("ReturnStatement", ";"):
+        return elementos[0]
+
+    elif lhs == "ReturnStatement" and rhs == ("return",):
+        validar_return(None, posiciones)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'RETURN',
+            None,
+            [],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "ReturnStatement" and rhs == ("return", "E"):
+        expr_nodo = elementos[1]
+
+        validar_return(expr_nodo, posiciones)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'RETURN',
+            None,
+            [expr_nodo],
             linea=linea,
             columna=columna
         )

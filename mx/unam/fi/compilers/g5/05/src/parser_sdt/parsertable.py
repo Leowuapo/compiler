@@ -3,7 +3,14 @@ from collections import defaultdict
 productions = [
     # Programa (múltiples statements)
     ("Program'", ["Program"]),
-    ("Program", ["StatementList"]),
+    ("Program", ["TopLevelList"]),
+
+    ("TopLevelList", ["TopLevel"]),
+    ("TopLevelList", ["TopLevelList", "TopLevel"]),
+
+    ("TopLevel", ["Statement"]),
+    ("TopLevel", ["FunctionDecl"]),
+
     ("StatementList", ["Statement"]),
     ("StatementList", ["StatementList", "Statement"]),
     
@@ -106,6 +113,19 @@ productions = [
     # Marcadores semánticos para contexto de loop
     ("EnterLoop", []),
     ("ExitLoop", []),
+
+    # Funciones básicas sin parámetros
+    ("FunctionDecl", ["FunctionHeader", "EnterFunction", "Block", "ExitFunction"]),
+    ("FunctionHeader", ["TYPE", "ID", "(", ")"]),
+
+    # Marcadores semánticos de función
+    ("EnterFunction", []),
+    ("ExitFunction", []),
+
+    # Return
+    ("Statement", ["ReturnStatement", ";"]),
+    ("ReturnStatement", ["return"]),
+    ("ReturnStatement", ["return", "E"]),
 ]
 
 prod_num = {}
@@ -119,11 +139,12 @@ terminales = {
     "++", "--",
     "if", "else", "while", "for",
     "switch", "case", "default",
-    "break", "continue"
+    "break", "continue", "return"
 }
 
 no_terminales = {
-    "Program'", "Program", "StatementList", "Statement",
+    "Program'", "Program", "TopLevelList", "TopLevel",
+    "StatementList", "Statement",
     "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
@@ -131,7 +152,9 @@ no_terminales = {
     "ForStatement", "ForInit", "ForUpdate",
     "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",
     "BreakStatement", "EnterBreak", "ExitBreak",
-    "ContinueStatement", "EnterLoop", "ExitLoop"
+    "ContinueStatement", "EnterLoop", "ExitLoop",
+    "FunctionDecl", "FunctionHeader", "EnterFunction", "ExitFunction",
+    "ReturnStatement"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}
