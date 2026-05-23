@@ -91,6 +91,12 @@ class TablaFunciones:
             'parametros': []
         }
 
+    def obtener(self, nombre, posiciones=None, indice=0):
+        if nombre not in self.funciones:
+            error_semantico(f"function '{nombre}' not declared", posiciones, indice)
+
+        return self.funciones[nombre]
+
     def mostrar(self):
         for nombre, datos in self.funciones.items():
             print(
@@ -1119,6 +1125,32 @@ def accion_semantica(produccion, elementos, posiciones=None):
             'RETURN',
             None,
             [expr_nodo],
+            linea=linea,
+            columna=columna
+        )
+    
+    # Llamadas a funciones
+    elif lhs == "Statement" and rhs == ("FunctionCall", ";"):
+        return elementos[0]
+
+    elif lhs == "FunctionCall" and rhs == ("ID", "(", ")"):
+        nombre_funcion = elementos[0]
+
+        info_funcion = tabla_funciones.obtener(nombre_funcion, posiciones, 0)
+
+        if info_funcion['parametros']:
+            error_semantico(
+                f"function '{nombre_funcion}' expects arguments",
+                posiciones,
+                0
+            )
+
+        linea, columna = _pos(posiciones, 0)
+
+        return Nodo(
+            'CALL',
+            nombre_funcion,
+            [],
             linea=linea,
             columna=columna
         )

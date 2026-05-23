@@ -126,6 +126,10 @@ productions = [
     ("Statement", ["ReturnStatement", ";"]),
     ("ReturnStatement", ["return"]),
     ("ReturnStatement", ["return", "E"]),
+
+    # Llamadas a funciones sin argumentos como statement
+    ("Statement", ["FunctionCall", ";"]),
+    ("FunctionCall", ["ID", "(", ")"]),
 ]
 
 prod_num = {}
@@ -154,7 +158,8 @@ no_terminales = {
     "BreakStatement", "EnterBreak", "ExitBreak",
     "ContinueStatement", "EnterLoop", "ExitLoop",
     "FunctionDecl", "FunctionHeader", "EnterFunction", "ExitFunction",
-    "ReturnStatement"
+    "ReturnStatement",
+    "FunctionCall"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}
