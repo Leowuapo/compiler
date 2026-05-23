@@ -58,6 +58,7 @@ productions = [
 
     ("MulExpr", ["MulExpr", "*", "UnaryExpr"]),
     ("MulExpr", ["MulExpr", "/", "UnaryExpr"]),
+    ("MulExpr", ["MulExpr", "%", "UnaryExpr"]),
     ("MulExpr", ["UnaryExpr"]),
 
     ("UnaryExpr", ["!", "UnaryExpr"]),
@@ -146,6 +147,14 @@ productions = [
 
     ("ArgList", ["E"]),
     ("ArgList", ["ArgList", ",", "E"]),
+
+    # Print / printf
+    ("Statement", ["PrintStatement", ";"]),
+
+    ("PrintStatement", ["print", "(", "E", ")"]),
+
+    ("PrintStatement", ["printf", "(", "CONST", ")"]),
+    ("PrintStatement", ["printf", "(", "CONST", ",", "ArgList", ")"]),
 ]
 
 prod_num = {}
@@ -155,11 +164,12 @@ for indice, (lado_izq, lado_der) in enumerate(productions):
 terminales = {
     "TYPE", "ID", "CONST", "=", ";", ":", ",", "{", "}", "(", ")", "$",
     "||", "&&", "==", "!=", "<", ">", "<=", ">=",
-    "+", "-", "*", "/", "!",
+    "+", "-", "*", "/", "%", "!",
     "++", "--",
     "if", "else", "while", "for",
     "switch", "case", "default",
-    "break", "continue", "return"
+    "break", "continue", "return",
+    "print", "printf"
 }
 
 no_terminales = {
@@ -176,7 +186,8 @@ no_terminales = {
     "FunctionDecl", "FunctionHeader", "FunctionBody",
     "EnterFunction", "ExitFunction", "EnterParams",
     "ParamList", "Param",
-    "ReturnStatement", "FunctionCall", "ArgList"
+    "ReturnStatement", "FunctionCall", "ArgList",
+    "PrintStatement"
 }
 
 primeros = {s: set() for s in terminales | no_terminales}

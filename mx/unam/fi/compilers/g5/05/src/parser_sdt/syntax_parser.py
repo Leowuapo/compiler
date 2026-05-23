@@ -26,7 +26,8 @@ def mapear_tokens(tokens):
         elif tipo == 'keyword' and valor in {
             'if', 'else', 'while', 'for',
             'switch', 'case', 'default',
-            'break', 'continue', 'return'
+            'break', 'continue', 'return',
+            'print', 'printf'
         }:
             simbolos.append(valor)
             lexemas.append(valor)
@@ -53,7 +54,7 @@ def mapear_tokens(tokens):
             posiciones.append((linea, columna))
 
         elif tipo == 'operator' and valor in {
-            '=', '+', '-', '*', '/',
+            '=', '+', '-', '*', '/', '%',
             '&&', '||', '!',
             '==', '!=', '<', '>', '<=', '>=',
             '++', '--'

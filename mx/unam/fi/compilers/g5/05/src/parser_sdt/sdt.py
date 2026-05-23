@@ -10,6 +10,18 @@ class Nodo:
         return f"Nodo({self.tipo}, {self.valor}, {self.hijos})"
 
 
+class ValorString:
+    def __init__(self, valor):
+        self.valor = valor
+
+    def __repr__(self):
+        return repr(self.valor)
+
+
+def es_string_literal(valor):
+    return isinstance(valor, ValorString)
+
+
 class ValorDesconocido:
     def __init__(self, tipo, descripcion=None):
         self.tipo = tipo
@@ -36,6 +48,10 @@ RANGOS = {
 def formatear_valor(valor):
     if es_valor_desconocido(valor):
         return repr(valor)
+
+    if es_string_literal(valor):
+        return repr(valor.valor)
+
     return repr(valor) if isinstance(valor, str) else valor
 
 
@@ -207,14 +223,21 @@ def normalizar_tipo(tipo, posiciones=None, indice=0):
 
 
 def inferir_tipo_constante(valor, nodo=None):
+    if es_string_literal(valor):
+        return "string"
+
     if isinstance(valor, bool):
         return "bool"
+
     if isinstance(valor, int):
         return "int"
+
     if isinstance(valor, float):
         return "double"
+
     if isinstance(valor, str) and len(valor) == 1:
         return "char"
+
     error_semantico(f"invalid constant '{valor}'", nodo=nodo)
 
 
@@ -420,25 +443,44 @@ def evaluar_con_tipo(nodo):
         if nodo.tipo == '>=':
             return izq_val >= der_val, "bool"
 
-    if nodo.tipo in {'+', '-', '*', '/'}:
+    if nodo.tipo in {'+', '-', '*', '/', '%'}:
         izq, tipo_izq = evaluar_con_tipo(nodo.hijos[0])
         der, tipo_der = evaluar_con_tipo(nodo.hijos[1])
 
         izq_num = valor_numerico(izq)
         der_num = valor_numerico(der)
 
+        # El módulo solo debe operar con tipos enteros.
+        if nodo.tipo == '%':
+            if tipo_izq in REALES or tipo_der in REALES:
+                error_semantico("modulo operator requires integer operands", nodo=nodo)
+
+            if es_valor_desconocido(izq_num) or es_valor_desconocido(der_num):
+                return ValorDesconocido("int", "modulo %"), "int"
+
+            if der_num == 0:
+                error_semantico("modulo by zero", nodo=nodo)
+
+            return int(izq_num % der_num), "int"
+
         tipo_res = tipo_aritmetico(tipo_izq, tipo_der, nodo.tipo)
 
+        # Si algún operando viene de parámetro o llamada a función,
+        # no podemos calcular el valor real en SDT.
+        # Solo propagamos el tipo resultante.
         if es_valor_desconocido(izq_num) or es_valor_desconocido(der_num):
             return ValorDesconocido(tipo_res, f"arithmetic {nodo.tipo}"), tipo_res
 
         if nodo.tipo == '+':
             valor = izq_num + der_num
+
         elif nodo.tipo == '-':
             valor = izq_num - der_num
+
         elif nodo.tipo == '*':
             valor = izq_num * der_num
-        else:
+
+        elif nodo.tipo == '/':
             if der_num == 0:
                 error_semantico("division by zero", nodo=nodo)
 
@@ -484,6 +526,27 @@ def _normalizar_lista_sentencias(nodo):
     return [nodo]
 
 
+def parsear_string_literal(val, posiciones=None, indice=0):
+    if not (isinstance(val, str) and len(val) >= 2 and val[0] == '"' and val[-1] == '"'):
+        error_semantico(f"expected string literal, got '{val}'", posiciones, indice)
+
+    contenido = val[1:-1]
+
+    escapes = {
+        "\\n": "\n",
+        "\\t": "\t",
+        "\\r": "\r",
+        "\\0": "\0",
+        '\\"': '"',
+        "\\\\": "\\",
+    }
+
+    for escape, real in escapes.items():
+        contenido = contenido.replace(escape, real)
+
+    return ValorString(contenido)
+
+
 def parsear_constante(val, posiciones=None, indice=0):
     if isinstance(val, (int, float, bool)):
         return val
@@ -492,6 +555,10 @@ def parsear_constante(val, posiciones=None, indice=0):
             return True
         if val == "false":
             return False
+
+        if len(val) >= 2 and val[0] == '"' and val[-1] == '"':
+            return parsear_string_literal(val, posiciones, indice)
+
         if len(val) >= 2 and val[0] == "'" and val[-1] == "'":
             contenido = val[1:-1]
             escapes = {"\\n": "\n", "\\t": "\t", "\\r": "\r", "\\0": "\0", "\\'": "'", "\\\\": "\\"}
@@ -596,10 +663,13 @@ def _crear_incdec(nombre_var, operador, posiciones=None, aplicar=False):
 
     valor_actual = valor_numerico(var_info['valor'])
 
-    if operador == "++":
-        nuevo_valor = valor_actual + 1
+    if es_valor_desconocido(valor_actual):
+        nuevo_valor = ValorDesconocido(tipo_var, f"{operador} {nombre_var}")
     else:
-        nuevo_valor = valor_actual - 1
+        if operador == "++":
+            nuevo_valor = valor_actual + 1
+        else:
+            nuevo_valor = valor_actual - 1
 
     if aplicar:
         ambito.asignar(nombre_var, nuevo_valor, posiciones, 0)
@@ -781,6 +851,96 @@ def declarar_parametros_funcion_actual(posiciones=None):
             posiciones,
             0
         )
+
+
+def validar_print_expr(expr_nodo):
+    evaluarexpresion(expr_nodo, con_tipo=True)
+
+
+def validar_printf_formato(formato_nodo):
+    valor, tipo = evaluarexpresion(formato_nodo, con_tipo=True)
+
+    if tipo != "string":
+        error_semantico(
+            "printf first argument must be a string literal",
+            nodo=formato_nodo
+        )
+
+    return valor.valor
+
+
+def validar_printf_args(formato_nodo, argumentos):
+    formato = validar_printf_formato(formato_nodo)
+    especificadores = extraer_formatos_printf(formato, formato_nodo)
+
+    if len(especificadores) != len(argumentos):
+        error_semantico(
+            f"printf expects {len(especificadores)} argument(s), got {len(argumentos)}",
+            nodo=formato_nodo
+        )
+
+    for indice, (especificador, arg) in enumerate(zip(especificadores, argumentos)):
+        _, tipo_arg = evaluarexpresion(arg, con_tipo=True)
+
+        if not tipo_compatible_printf(especificador, tipo_arg):
+            error_semantico(
+                f"printf argument {indice + 1} expects '%{especificador}' compatible type, got '{tipo_arg}'",
+                nodo=arg
+            )
+
+
+def extraer_formatos_printf(formato, nodo=None):
+    especificadores = []
+    permitidos = {"d", "i", "u", "f", "c", "s", "b"}
+
+    i = 0
+    while i < len(formato):
+        if formato[i] != "%":
+            i += 1
+            continue
+
+        if i + 1 >= len(formato):
+            error_semantico("incomplete printf format specifier", nodo=nodo)
+
+        siguiente = formato[i + 1]
+
+        # % imprime un porcentaje literal y no consume argumento
+        if siguiente == "%":
+            i += 2
+            continue
+
+        if siguiente not in permitidos:
+            error_semantico(
+                f"unsupported printf format specifier '%{siguiente}'",
+                nodo=nodo
+            )
+
+        especificadores.append(siguiente)
+        i += 2
+
+    return especificadores
+
+
+def tipo_compatible_printf(especificador, tipo):
+    if especificador in {"d", "i"}:
+        return tipo in ENTEROS | {"char", "bool"}
+
+    if especificador == "u":
+        return tipo in ENTEROS | {"char", "bool"}
+
+    if especificador == "f":
+        return tipo in ENTEROS | REALES | {"char", "bool"}
+
+    if especificador == "c":
+        return tipo in ENTEROS | {"char"}
+
+    if especificador == "s":
+        return tipo == "string"
+
+    if especificador == "b":
+        return tipo == "bool"
+
+    return False
 
 
 def accion_semantica(produccion, elementos, posiciones=None):
@@ -1161,7 +1321,7 @@ def accion_semantica(produccion, elementos, posiciones=None):
         '||', '&&',
         '==', '!=',
         '<', '>', '<=', '>=',
-        '+', '-', '*', '/'
+        '+', '-', '*', '/', '%'
     }:
         return _nodo_binario(rhs[1], elementos, posiciones)
 
@@ -1416,6 +1576,68 @@ def accion_semantica(produccion, elementos, posiciones=None):
 
     elif lhs == "ArgList" and rhs == ("ArgList", ",", "E"):
         return elementos[0] + [elementos[2]]
+
+    # Print/Printf
+    elif lhs == "Statement" and rhs == ("PrintStatement", ";"):
+        return elementos[0]
+
+    elif lhs == "PrintStatement" and rhs == ("print", "(", "E", ")"):
+        expr = elementos[2]
+
+        validar_print_expr(expr)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'PRINT',
+            None,
+            [expr],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "PrintStatement" and rhs == ("printf", "(", "CONST", ")"):
+        linea_const, columna_const = _pos(posiciones, 2)
+
+        formato = Nodo(
+            'CONST',
+            parsear_constante(elementos[2], posiciones, 2),
+            linea=linea_const,
+            columna=columna_const
+        )
+
+        validar_printf_args(formato, [])
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'PRINTF',
+            None,
+            [formato],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "PrintStatement" and rhs == ("printf", "(", "CONST", ",", "ArgList", ")"):
+        linea_const, columna_const = _pos(posiciones, 2)
+
+        formato = Nodo(
+            'CONST',
+            parsear_constante(elementos[2], posiciones, 2),
+            linea=linea_const,
+            columna=columna_const
+        )
+
+        argumentos = elementos[4]
+
+        validar_printf_args(formato, argumentos)
+
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'PRINTF',
+            None,
+            [formato] + argumentos,
+            linea=linea,
+            columna=columna
+        )
 
     error_semantico(
         f"semantic action not implemented for production: {lhs} -> {' '.join(rhs)}",
