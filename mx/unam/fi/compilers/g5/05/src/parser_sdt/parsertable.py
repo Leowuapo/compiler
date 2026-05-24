@@ -25,9 +25,11 @@ productions = [
     ("DeclList", ["DeclList", ",", "DeclItem"]),
     ("DeclItem", ["ID"]),
     ("DeclItem", ["ID", "=", "E"]),
+    ("DeclItem", ["ID", "[", "CONST", "]"]),
     
     # Asignación (variable ya declarada)
     ("Assignment", ["ID", "=", "E"]),
+    ("Assignment", ["ArrayAccess", "=", "E"]),
     
     # Bloque con ámbito
     ("Block", ["{", "StatementList", "}"]),
@@ -64,10 +66,12 @@ productions = [
     ("UnaryExpr", ["!", "UnaryExpr"]),
     ("UnaryExpr", ["Primary"]),
 
+    # Primary
     ("Primary", ["(", "E", ")"]),
     ("Primary", ["ID"]),
     ("Primary", ["CONST"]),
     ("Primary", ["FunctionCall"]),
+    ("Primary", ["ArrayAccess"]),
 
     # If / else
     ("Statement", ["IfStatement"]),
@@ -155,6 +159,9 @@ productions = [
 
     ("PrintStatement", ["printf", "(", "CONST", ")"]),
     ("PrintStatement", ["printf", "(", "CONST", ",", "ArgList", ")"]),
+
+    # Acceso a arreglos
+    ("ArrayAccess", ["ID", "[", "E", "]"]),
 ]
 
 prod_num = {}
@@ -162,7 +169,8 @@ for indice, (lado_izq, lado_der) in enumerate(productions):
     prod_num[(lado_izq, tuple(lado_der))] = indice
 
 terminales = {
-    "TYPE", "ID", "CONST", "=", ";", ":", ",", "{", "}", "(", ")", "$",
+    "TYPE", "ID", "CONST", "=", ";", ":", ",", 
+    "{", "}", "(", ")", "[", "]", "$",
     "||", "&&", "==", "!=", "<", ">", "<=", ">=",
     "+", "-", "*", "/", "%", "!",
     "++", "--",
@@ -178,6 +186,7 @@ no_terminales = {
     "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
+    "ArrayAccess",
     "IfStatement", "WhileStatement", 
     "ForStatement", "ForInit", "ForUpdate",
     "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",

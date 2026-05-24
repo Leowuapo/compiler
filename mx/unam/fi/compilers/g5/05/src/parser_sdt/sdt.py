@@ -104,8 +104,112 @@ class TablaSimbolos:
 
     def mostrar(self):
         for nombre, datos in self.simbolos.items():
-            print(f"{nombre} -> type: {datos['tipo']}, value: {formatear_valor(datos['valor'])}")
+            if datos.get('es_array', False):
+                valores = [formatear_valor(v) for v in datos['valor']]
+                print(
+                    f"{nombre} -> type: {datos['tipo']}[{datos['tamano']}], "
+                    f"value: {valores}"
+                )
+            else:
+                print(
+                    f"{nombre} -> type: {datos['tipo']}, "
+                    f"value: {formatear_valor(datos['valor'])}"
+                )
 
+    def declarar_array(self, nombre, tipo, tamano, posiciones=None, indice=0):
+        tipo = normalizar_tipo(tipo, posiciones, indice)
+
+        if tipo == "void":
+            error_semantico(f"array '{nombre}' cannot be declared as void", posiciones, indice)
+
+        if nombre in self.simbolos:
+            error_semantico(f"variable '{nombre}' already declared", posiciones, indice)
+
+        if not isinstance(tamano, int):
+            error_semantico(f"array size for '{nombre}' must be an integer", posiciones, indice)
+
+        if tamano <= 0:
+            error_semantico(f"array size for '{nombre}' must be greater than zero", posiciones, indice)
+
+        self.simbolos[nombre] = {
+            'tipo': tipo,
+            'valor': [None] * tamano,
+            'es_array': True,
+            'tamano': tamano
+        }
+
+    def asignar_array(self, nombre, indice_array, valor, posiciones=None, indice=0, nodo=None):
+        if nombre not in self.simbolos:
+            error_semantico(f"array '{nombre}' not declared", posiciones, indice, nodo)
+
+        datos = self.simbolos[nombre]
+
+        if not datos.get('es_array', False):
+            error_semantico(f"variable '{nombre}' is not an array", posiciones, indice, nodo)
+
+        if es_valor_desconocido(indice_array):
+            error_semantico(
+                f"array index for '{nombre}' must be known at semantic analysis",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        if not isinstance(indice_array, int):
+            error_semantico(f"array index for '{nombre}' must be an integer", posiciones, indice, nodo)
+
+        if indice_array < 0 or indice_array >= datos['tamano']:
+            error_semantico(
+                f"array index {indice_array} out of bounds for '{nombre}' with size {datos['tamano']}",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        datos['valor'][indice_array] = convertir_a_tipo(
+            valor,
+            datos['tipo'],
+            f"{nombre}[{indice_array}]",
+            posiciones,
+            indice,
+            nodo
+        )
+
+    def obtener_array(self, nombre, indice_array, posiciones=None, indice=0, nodo=None):
+        if nombre not in self.simbolos:
+            error_semantico(f"array '{nombre}' not declared", posiciones, indice, nodo)
+
+        datos = self.simbolos[nombre]
+
+        if not datos.get('es_array', False):
+            error_semantico(f"variable '{nombre}' is not an array", posiciones, indice, nodo)
+
+        if es_valor_desconocido(indice_array):
+            return ValorDesconocido(datos['tipo'], f"{nombre}[unknown]"), datos['tipo']
+
+        if not isinstance(indice_array, int):
+            error_semantico(f"array index for '{nombre}' must be an integer", posiciones, indice, nodo)
+
+        if indice_array < 0 or indice_array >= datos['tamano']:
+            error_semantico(
+                f"array index {indice_array} out of bounds for '{nombre}' with size {datos['tamano']}",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        valor = datos['valor'][indice_array]
+
+        if valor is None:
+            error_semantico(
+                f"array element '{nombre}[{indice_array}]' used before initialization",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        return valor, datos['tipo']
+    
 class TablaFunciones:
     def __init__(self):
         self.funciones = {}
@@ -375,12 +479,24 @@ def evaluar_con_tipo(nodo):
 
     if nodo.tipo == 'ID':
         ambito, var_info = buscar_variable(nodo.valor)
+
         if ambito is None:
             error_semantico(f"variable '{nodo.valor}' not declared", nodo=nodo)
+
+        if var_info.get('es_array', False):
+            error_semantico(
+                f"array '{nodo.valor}' cannot be used as a scalar expression",
+                nodo=nodo
+            )
+
         if var_info['valor'] is None:
             error_semantico(f"variable '{nodo.valor}' used before initialization", nodo=nodo)
+
         return var_info['valor'], var_info['tipo']
     
+    if nodo.tipo == 'ARRAY_ACCESS':
+        return _evaluar_array_access(nodo)
+
     if nodo.tipo == 'CALL':
         info_funcion = tabla_funciones.obtener(nodo.valor)
 
@@ -500,6 +616,9 @@ def evaluar_con_tipo(nodo):
 
 
 def _declarar_item(tipo_dato, item):
+    if item.tipo == 'DECL_ARRAY_ITEM':
+        return _declarar_array_item(tipo_dato, item)
+    
     nombre_var = item.valor
     expr_nodo = item.hijos[0] if item.hijos else None
     tabla_actual = obtener_tabla_actual()
@@ -961,6 +1080,120 @@ def validar_funcion_retorno(header):
         )
 
 
+def _evaluar_indice_array(indice_nodo):
+    valor_indice, tipo_indice = evaluarexpresion(indice_nodo, con_tipo=True)
+
+    if tipo_indice not in ENTEROS | {"char", "bool"}:
+        error_semantico(
+            f"array index must be integer-compatible, got '{tipo_indice}'",
+            nodo=indice_nodo
+        )
+
+    if es_valor_desconocido(valor_indice):
+        return valor_indice
+
+    valor_indice = valor_numerico(valor_indice)
+
+    if not isinstance(valor_indice, int):
+        error_semantico("array index must be an integer", nodo=indice_nodo)
+
+    return valor_indice
+
+
+def _declarar_array_item(tipo_dato, item):
+    nombre_var = item.valor
+    tamano_nodo = item.hijos[0]
+
+    tamano_valor, tamano_tipo = evaluarexpresion(tamano_nodo, con_tipo=True)
+
+    if tamano_tipo not in ENTEROS | {"char", "bool"}:
+        error_semantico(
+            f"array size for '{nombre_var}' must be integer-compatible",
+            nodo=tamano_nodo
+        )
+
+    if es_valor_desconocido(tamano_valor):
+        error_semantico(
+            f"array size for '{nombre_var}' must be known at compile time",
+            nodo=tamano_nodo
+        )
+
+    tamano = valor_numerico(tamano_valor)
+
+    tabla_actual = obtener_tabla_actual()
+    pos_item = [(item.linea, item.columna)] if item.linea is not None else None
+
+    tabla_actual.declarar_array(nombre_var, tipo_dato, tamano, pos_item, 0)
+
+    return Nodo(
+        'DECL_ARRAY',
+        nombre_var,
+        [
+            Nodo('TYPE', tipo_dato, linea=item.linea, columna=item.columna),
+            tamano_nodo
+        ],
+        linea=item.linea,
+        columna=item.columna
+    )
+
+
+def _crear_array_access(nombre_var, indice_nodo, posiciones=None):
+    linea, columna = _pos(posiciones, 0)
+
+    return Nodo(
+        'ARRAY_ACCESS',
+        nombre_var,
+        [indice_nodo],
+        linea=linea,
+        columna=columna
+    )
+
+
+def _evaluar_array_access(nodo):
+    nombre_var = nodo.valor
+    indice_nodo = nodo.hijos[0]
+
+    indice_valor = _evaluar_indice_array(indice_nodo)
+
+    ambito, _ = buscar_variable(nombre_var)
+
+    if ambito is None:
+        error_semantico(f"array '{nombre_var}' not declared", nodo=nodo)
+
+    return ambito.obtener_array(nombre_var, indice_valor, nodo=nodo)
+
+
+def _asignar_array_access(array_nodo, expr_nodo, posiciones=None):
+    nombre_var = array_nodo.valor
+    indice_nodo = array_nodo.hijos[0]
+
+    indice_valor = _evaluar_indice_array(indice_nodo)
+    valor = evaluarexpresion(expr_nodo)
+
+    ambito, _ = buscar_variable(nombre_var)
+
+    if ambito is None:
+        error_semantico(f"array '{nombre_var}' not declared", nodo=array_nodo)
+
+    ambito.asignar_array(
+        nombre_var,
+        indice_valor,
+        valor,
+        posiciones,
+        0,
+        nodo=array_nodo
+    )
+
+    linea, columna = _pos(posiciones, 0)
+    return Nodo(
+        'ASSIGN_ARRAY',
+        nombre_var,
+        [indice_nodo, expr_nodo],
+        linea=linea,
+        columna=columna
+    )
+
+
 def accion_semantica(produccion, elementos, posiciones=None):
     global funcion_pendiente
     
@@ -1036,6 +1269,25 @@ def accion_semantica(produccion, elementos, posiciones=None):
         linea, columna = _pos(posiciones, 0)
         return Nodo('DECL_ITEM', elementos[0], [elementos[2]], linea=linea, columna=columna)
 
+    elif lhs == "DeclItem" and rhs == ("ID", "[", "CONST", "]"):
+        linea, columna = _pos(posiciones, 0)
+        const_linea, const_columna = _pos(posiciones, 2)
+
+        tamano_nodo = Nodo(
+            'CONST',
+            parsear_constante(elementos[2], posiciones, 2),
+            linea=const_linea,
+            columna=const_columna
+        )
+
+        return Nodo(
+            'DECL_ARRAY_ITEM',
+            elementos[0],
+            [tamano_nodo],
+            linea=linea,
+            columna=columna
+        )
+    
     # Asignación
     elif lhs == "Assignment" and rhs == ("ID", "=", "E"):
         return _crear_asignacion(
@@ -1043,6 +1295,13 @@ def accion_semantica(produccion, elementos, posiciones=None):
             elementos[2],
             posiciones,
             aplicar=True
+        )
+    
+    elif lhs == "Assignment" and rhs == ("ArrayAccess", "=", "E"):
+        return _asignar_array_access(
+            elementos[0],
+            elementos[2],
+            posiciones
         )
 
     # Bloques
@@ -1367,6 +1626,9 @@ def accion_semantica(produccion, elementos, posiciones=None):
     elif lhs == "Primary" and rhs == ("FunctionCall",):
         return elementos[0]
     
+    elif lhs == "Primary" and rhs == ("ArrayAccess",):
+        return elementos[0]
+    
     # Funciones
     elif lhs == "FunctionHeader" and rhs == ("TYPE", "ID", "(", ")"):
         tipo_retorno = normalizar_tipo(elementos[0], posiciones, 0)
@@ -1658,6 +1920,14 @@ def accion_semantica(produccion, elementos, posiciones=None):
             linea=linea,
             columna=columna
         )
+
+    #Arrays
+    elif lhs == "ArrayAccess" and rhs == ("ID", "[", "E", "]"):
+        return _crear_array_access(
+            elementos[0],
+            elementos[2],
+            posiciones
+    )
 
     error_semantico(
         f"semantic action not implemented for production: {lhs} -> {' '.join(rhs)}",

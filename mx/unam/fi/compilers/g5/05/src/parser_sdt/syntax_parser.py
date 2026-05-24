@@ -92,6 +92,16 @@ def mapear_tokens(tokens):
             simbolos.append('}')
             lexemas.append(valor)
             posiciones.append((linea, columna))
+
+        elif tipo == 'punctuation' and valor == '[':
+            simbolos.append('[')
+            lexemas.append(valor)
+            posiciones.append((linea, columna))
+
+        elif tipo == 'punctuation' and valor == ']':
+            simbolos.append(']')
+            lexemas.append(valor)
+            posiciones.append((linea, columna))
         
         elif tipo == 'punctuation' and valor == ':':
             simbolos.append(':')
