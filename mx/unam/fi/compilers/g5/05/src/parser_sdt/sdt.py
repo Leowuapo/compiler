@@ -517,6 +517,53 @@ def evaluar_con_tipo(nodo):
             return ValorDesconocido("bool", f"!{valor.descripcion}"), "bool"
 
         return not valor_booleano(valor), "bool"
+    
+    if nodo.tipo == 'NEG':
+        valor, tipo = evaluar_con_tipo(nodo.hijos[0])
+
+        if tipo not in ENTEROS | REALES | {"char", "bool"}:
+            error_semantico(
+                f"unary '-' cannot be applied to type '{tipo}'",
+                nodo=nodo
+            )
+
+        if es_valor_desconocido(valor):
+            return ValorDesconocido(tipo, "unary -"), tipo
+
+        valor_num = valor_numerico(valor)
+        resultado = -valor_num
+
+        if tipo in ENTEROS:
+            return int(resultado), "int"
+
+        if tipo in REALES:
+            return float(resultado), tipo
+
+        if tipo == "char" or tipo == "bool":
+            return int(resultado), "int"
+        
+    if nodo.tipo == 'POS':
+        valor, tipo = evaluar_con_tipo(nodo.hijos[0])
+
+        if tipo not in ENTEROS | REALES | {"char", "bool"}:
+            error_semantico(
+                f"unary '+' cannot be applied to type '{tipo}'",
+                nodo=nodo
+            )
+
+        if es_valor_desconocido(valor):
+            return ValorDesconocido(tipo, "unary +"), tipo
+
+        valor_num = valor_numerico(valor)
+
+        if tipo in ENTEROS:
+            return int(valor_num), "int"
+
+        if tipo in REALES:
+            return float(valor_num), tipo
+
+        if tipo == "char" or tipo == "bool":
+            return int(valor_num), "int"
 
     if nodo.tipo == '&&':
         izq, _ = evaluar_con_tipo(nodo.hijos[0])
@@ -1605,6 +1652,12 @@ def accion_semantica(produccion, elementos, posiciones=None):
     # Operador unario
     elif lhs == "UnaryExpr" and rhs == ("!", "UnaryExpr"):
         return _nodo_unario('!', elementos, posiciones)
+    
+    elif lhs == "UnaryExpr" and rhs == ("-", "UnaryExpr"):
+        return _nodo_unario('NEG', elementos, posiciones)
+
+    elif lhs == "UnaryExpr" and rhs == ("+", "UnaryExpr"):
+        return _nodo_unario('POS', elementos, posiciones)
 
     # Primary
     elif lhs == "Primary" and rhs == ("(", "E", ")"):

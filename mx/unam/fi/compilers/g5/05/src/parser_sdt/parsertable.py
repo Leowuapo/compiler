@@ -64,6 +64,8 @@ productions = [
     ("MulExpr", ["UnaryExpr"]),
 
     ("UnaryExpr", ["!", "UnaryExpr"]),
+    ("UnaryExpr", ["-", "UnaryExpr"]),
+    ("UnaryExpr", ["+", "UnaryExpr"]),
     ("UnaryExpr", ["Primary"]),
 
     # Primary
