@@ -1316,21 +1316,13 @@ def accion_semantica(produccion, elementos, posiciones=None):
         linea, columna = _pos(posiciones, 0)
         return Nodo('DECL_ITEM', elementos[0], [elementos[2]], linea=linea, columna=columna)
 
-    elif lhs == "DeclItem" and rhs == ("ID", "[", "CONST", "]"):
+    elif lhs == "DeclItem" and rhs == ("ID", "[", "E", "]"):
         linea, columna = _pos(posiciones, 0)
-        const_linea, const_columna = _pos(posiciones, 2)
-
-        tamano_nodo = Nodo(
-            'CONST',
-            parsear_constante(elementos[2], posiciones, 2),
-            linea=const_linea,
-            columna=const_columna
-        )
 
         return Nodo(
             'DECL_ARRAY_ITEM',
             elementos[0],
-            [tamano_nodo],
+            [elementos[2]],
             linea=linea,
             columna=columna
         )

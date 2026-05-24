@@ -25,7 +25,7 @@ productions = [
     ("DeclList", ["DeclList", ",", "DeclItem"]),
     ("DeclItem", ["ID"]),
     ("DeclItem", ["ID", "=", "E"]),
-    ("DeclItem", ["ID", "[", "CONST", "]"]),
+    ("DeclItem", ["ID", "[", "E", "]"]),
     
     # Asignación (variable ya declarada)
     ("Assignment", ["ID", "=", "E"]),
