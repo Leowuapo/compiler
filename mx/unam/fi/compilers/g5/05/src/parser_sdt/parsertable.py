@@ -26,6 +26,7 @@ productions = [
     ("DeclItem", ["ID"]),
     ("DeclItem", ["ID", "=", "E"]),
     ("DeclItem", ["ID", "[", "E", "]"]),
+    ("DeclItem", ["ID", "[", "E", "]", "=", "{", "InitList", "}"]),
     
     # Asignación (variable ya declarada)
     ("Assignment", ["ID", "=", "E"]),
@@ -164,6 +165,10 @@ productions = [
 
     # Acceso a arreglos
     ("ArrayAccess", ["ID", "[", "E", "]"]),
+
+    # Inicialización de arreglos
+    ("InitList", ["E"]),
+    ("InitList", ["InitList", ",", "E"]),
 ]
 
 prod_num = {}
@@ -188,7 +193,7 @@ no_terminales = {
     "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
-    "ArrayAccess",
+    "ArrayAccess", "InitList",
     "IfStatement", "WhileStatement", 
     "ForStatement", "ForInit", "ForUpdate",
     "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",

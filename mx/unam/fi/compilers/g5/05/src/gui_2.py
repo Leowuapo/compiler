@@ -14,7 +14,9 @@ try:
     import customtkinter as ctk
 except ImportError:
     import tkinter as tk
+    import tkinter.font as tkfont
     from tkinter import messagebox
+
     root = tk.Tk()
     root.withdraw()
     messagebox.showerror(
@@ -27,7 +29,9 @@ except ImportError:
     sys.exit(1)
 
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
+
 
 try:
     from PIL import Image, ImageTk
@@ -82,6 +86,8 @@ class CompilerGUI:
         'purple': '#a78bfa',
         'orange': '#fb923c',
         'green': '#86efac',
+        'ast_edge': '#46637f',
+        'ast_outline': '#7dd3fc',
     }
 
     SAMPLE_CODE = """int main() {
@@ -114,8 +120,15 @@ class CompilerGUI:
         self.ast_output_base = os.path.join(SRC_ROOT, "ast")
         self.ast_png_path = self.ast_output_base + ".png"
         self.ast_dot_path = self.ast_output_base + ".dot"
-        self.ast_modern_png_path = os.path.join(SRC_ROOT, "ast_modern.png")
         self.ast_modern_dot_path = os.path.join(SRC_ROOT, "ast_modern.dot")
+        self.ast_modern_svg_path = os.path.join(SRC_ROOT, "ast_modern.svg")
+
+        # PNG solo para vista previa dentro de Tkinter.
+        # Se regenera con mejor resolución al hacer zoom.
+        self.ast_graphviz_preview_png_path = os.path.join(SRC_ROOT, "ast_modern_preview.png")
+
+        # Compatibilidad con código anterior
+        self.ast_modern_png_path = self.ast_graphviz_preview_png_path
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -371,27 +384,51 @@ class CompilerGUI:
     def _build_graphviz_tab(self):
         tab = self.tabs.tab("AST Graphviz")
         tab.grid_rowconfigure(1, weight=1)
+        tab.grid_columnconfigure(0, weight=1)
+
         toolbar = ctk.CTkFrame(tab, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
-        self._small_button(toolbar, "Imagen −", lambda: self.zoom_graphviz(0.85)).pack(side="left", padx=3)
-        self._small_button(toolbar, "Imagen +", lambda: self.zoom_graphviz(1.15)).pack(side="left", padx=3)
+
+        self._small_button(toolbar, "SVG −", lambda: self.zoom_graphviz(0.85)).pack(side="left", padx=3)
+        self._small_button(toolbar, "SVG +", lambda: self.zoom_graphviz(1.15)).pack(side="left", padx=3)
+        self._small_button(toolbar, "Fit", self.fit_graphviz_to_view).pack(side="left", padx=3)
         self._small_button(toolbar, "Reset", self.reset_graphviz_zoom).pack(side="left", padx=3)
+        self._small_button(toolbar, "Exportar SVG", self.export_graphviz_svg).pack(side="left", padx=3)
         self._small_button(toolbar, "Exportar PNG", self.export_graphviz_image).pack(side="left", padx=3)
 
         shell = ctk.CTkFrame(tab, fg_color=self.THEME['panel_2'])
         shell.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         shell.grid_rowconfigure(0, weight=1)
         shell.grid_columnconfigure(0, weight=1)
-        self.graphviz_canvas = tk.Canvas(shell, bg=self.THEME['panel_2'], highlightthickness=0)
+
+        self.graphviz_canvas = tk.Canvas(
+            shell,
+            bg=self.THEME['panel_2'],
+            highlightthickness=0
+        )
         self.graphviz_canvas.grid(row=0, column=0, sticky="nsew")
+
         vbar = ctk.CTkScrollbar(shell, orientation="vertical", command=self.graphviz_canvas.yview)
         hbar = ctk.CTkScrollbar(shell, orientation="horizontal", command=self.graphviz_canvas.xview)
+
         vbar.grid(row=0, column=1, sticky="ns")
         hbar.grid(row=1, column=0, sticky="ew")
-        self.graphviz_canvas.configure(yscrollcommand=vbar.set, xscrollcommand=hbar.set)
+
+        self.graphviz_canvas.configure(
+            yscrollcommand=vbar.set,
+            xscrollcommand=hbar.set
+        )
+
+        # Arrastrar imagen con mouse
+        self.graphviz_canvas.bind("<ButtonPress-1>", lambda e: self.graphviz_canvas.scan_mark(e.x, e.y))
+        self.graphviz_canvas.bind("<B1-Motion>", lambda e: self.graphviz_canvas.scan_dragto(e.x, e.y, gain=1))
+
         self.graphviz_canvas.create_text(
-            30, 30, anchor="nw", fill=self.THEME['muted'],
-            text="Compila código para generar la imagen del AST con Graphviz."
+            30,
+            30,
+            anchor="nw",
+            fill=self.THEME['muted'],
+            text="Compila código para generar el AST con Graphviz SVG."
         )
 
     def _make_textbox(self, parent):
@@ -657,7 +694,15 @@ class CompilerGUI:
             self.last_ast = getattr(parser, "ultimo_ast", None)
             if self.last_ast is not None:
                 self.populate_ast_tree(self.last_ast)
-                self.draw_ast_canvas(self.last_ast)
+
+                # El AST Canvas manual se desactiva como vista principal.
+                # Graphviz SVG será la vista visual principal.
+                if hasattr(self, "ast_canvas"):
+                    self.draw_ast_placeholder(
+                        "Vista Canvas manual desactivada.\n"
+                        "Usa la pestaña AST Graphviz para ver el árbol en alta calidad."
+                    )
+
                 self.export_ast_graphviz_modern(self.last_ast)
                 self.load_graphviz_image()
             else:
@@ -798,69 +843,189 @@ class CompilerGUI:
 
     def draw_ast_canvas(self, ast):
         self.ast_canvas.delete("all")
+
         if ast is None:
             self.draw_ast_placeholder("Sin AST disponible.")
             return
 
-        leaf_width = 150 * self.ast_scale
-        level_height = 105 * self.ast_scale
-        margin_x = 70 * self.ast_scale
-        margin_y = 60 * self.ast_scale
+        scale = self.ast_scale
+
+        font_size = max(8, int(10 * scale))
+        font = tkfont.Font(family="Menlo", size=font_size, weight="bold")
+
+        level_gap = 105 * scale
+        sibling_gap = 34 * scale
+        subtree_gap = 42 * scale
+        margin_x = 80 * scale
+        margin_y = 70 * scale
+
+        node_sizes = {}
+        subtree_widths = {}
         positions = {}
 
-        def leaves(node):
-            children = getattr(node, 'hijos', []) or []
+        def get_children(node):
+            return getattr(node, "hijos", []) or []
+
+        def measure_node(node):
+            label = self._node_label(node)
+            lines = label.split("\n")
+
+            text_width = max(font.measure(line) for line in lines) if lines else 60
+            line_height = font.metrics("linespace")
+
+            padding_x = int(28 * scale)
+            padding_y = int(16 * scale)
+
+            width = text_width + padding_x
+            height = len(lines) * line_height + padding_y
+
+            width = max(int(82 * scale), min(width, int(190 * scale)))
+            height = max(int(42 * scale), height)
+
+            node_sizes[id(node)] = (width, height)
+            return width, height
+
+        def measure_subtree(node):
+            node_w, _ = measure_node(node)
+            children = get_children(node)
+
             if not children:
-                return 1
-            return sum(leaves(child) for child in children)
+                subtree_widths[id(node)] = node_w
+                return node_w
 
-        total_leaves = leaves(ast)
-        total_width = max(900, total_leaves * leaf_width + 2 * margin_x)
+            children_width = 0
 
-        def layout(node, x0, x1, depth):
-            x = (x0 + x1) / 2
-            y = margin_y + depth * level_height
+            for i, child in enumerate(children):
+                children_width += measure_subtree(child)
+                if i < len(children) - 1:
+                    children_width += sibling_gap
+
+            width = max(node_w, children_width)
+            subtree_widths[id(node)] = width
+            return width
+
+        def layout(node, left, depth):
+            subtree_w = subtree_widths[id(node)]
+            node_w, _ = node_sizes[id(node)]
+
+            x = left + subtree_w / 2
+            y = margin_y + depth * level_gap
+
             positions[id(node)] = (x, y)
-            children = getattr(node, 'hijos', []) or []
-            if children:
-                cursor = x0
-                total = sum(leaves(child) for child in children)
-                for child in children:
-                    span = (x1 - x0) * leaves(child) / total
-                    layout(child, cursor, cursor + span, depth + 1)
-                    cursor += span
 
-        layout(ast, margin_x, total_width - margin_x, 0)
+            children = get_children(node)
+            if not children:
+                return
+
+            children_total = sum(subtree_widths[id(child)] for child in children)
+            children_total += sibling_gap * (len(children) - 1)
+
+            child_left = left + (subtree_w - children_total) / 2
+
+            for child in children:
+                layout(child, child_left, depth + 1)
+                child_left += subtree_widths[id(child)] + sibling_gap
 
         def max_depth(node):
-            children = getattr(node, 'hijos', []) or []
+            children = get_children(node)
+
             if not children:
                 return 0
+
             return 1 + max(max_depth(child) for child in children)
+
+        total_width = measure_subtree(ast) + margin_x * 2
+        layout(ast, margin_x, 0)
 
         def draw_edges(node):
             x, y = positions[id(node)]
-            for child in getattr(node, 'hijos', []) or []:
+            node_w, node_h = node_sizes[id(node)]
+
+            for child in get_children(node):
                 cx, cy = positions[id(child)]
-                self.ast_canvas.create_line(x, y + 24, cx, cy - 24, fill="#64748b", width=max(1, 2 * self.ast_scale), smooth=True)
+                child_w, child_h = node_sizes[id(child)]
+
+                self.ast_canvas.create_line(
+                    x,
+                    y + node_h / 2 + 4 * scale,
+                    cx,
+                    cy - child_h / 2 - 4 * scale,
+                    fill=self.THEME.get("ast_edge", "#38546f"),
+                    width=max(1, int(2 * scale)),
+                )
+
                 draw_edges(child)
 
         def draw_nodes(node):
             x, y = positions[id(node)]
+            width, height = node_sizes[id(node)]
+
             label = self._node_label(node)
-            width = max(92, min(190, 12 * len(label))) * self.ast_scale
-            height = 48 * self.ast_scale
-            color = self._ast_color(getattr(node, 'tipo', ''))
-            self._round_rect(self.ast_canvas, x - width / 2, y - height / 2, x + width / 2, y + height / 2,
-                             radius=14 * self.ast_scale, fill=color, outline="#93c5fd", width=max(1, 1.5 * self.ast_scale))
-            self.ast_canvas.create_text(x, y, text=label, fill="#f8fafc", font=("Consolas", max(8, int(10 * self.ast_scale)), "bold"), width=width - 12)
-            for child in getattr(node, 'hijos', []) or []:
+            fill = self._ast_color(getattr(node, "tipo", ""))
+            outline = self.THEME.get("ast_outline", "#60a5fa")
+
+            # Rectángulo limpio. En Tkinter se ve mejor que un borde redondeado mal suavizado.
+            self.ast_canvas.create_rectangle(
+                x - width / 2,
+                y - height / 2,
+                x + width / 2,
+                y + height / 2,
+                fill=fill,
+                outline=outline,
+                width=max(1, int(2 * scale)),
+            )
+
+            self.ast_canvas.create_text(
+                x,
+                y,
+                text=label,
+                fill="#f8fafc",
+                font=("Menlo", font_size, "bold"),
+                justify="center",
+            )
+
+            for child in get_children(node):
                 draw_nodes(child)
 
         draw_edges(ast)
         draw_nodes(ast)
-        total_height = margin_y * 2 + (max_depth(ast) + 1) * level_height
-        self.ast_canvas.configure(scrollregion=(0, 0, total_width, total_height))
+
+        total_height = margin_y * 2 + (max_depth(ast) + 1) * level_gap
+
+        self.ast_canvas.configure(
+            scrollregion=(
+                0,
+                0,
+                max(total_width, self.ast_canvas.winfo_width()),
+                max(total_height, self.ast_canvas.winfo_height()),
+            )
+        )
+
+    def _node_box_size(self, node):
+        label = self._node_label(node)
+
+        font_size = max(8, int(10 * self.ast_scale))
+        font = tkfont.Font(family="Consolas", size=font_size, weight="bold")
+
+        lines = label.split("\n")
+
+        text_width = max(font.measure(line) for line in lines) if lines else 80
+        line_height = font.metrics("linespace")
+
+        padding_x = int(28 * self.ast_scale)
+        padding_y = int(18 * self.ast_scale)
+
+        width = text_width + padding_x
+        height = len(lines) * line_height + padding_y
+
+        min_width = int(88 * self.ast_scale)
+        max_width = int(260 * self.ast_scale)
+        min_height = int(44 * self.ast_scale)
+
+        width = max(min_width, min(width, max_width))
+        height = max(min_height, height)
+
+        return width, height
 
     def draw_ast_placeholder(self, message):
         self.ast_canvas.delete("all")
@@ -878,9 +1043,24 @@ class CompilerGUI:
             self.draw_ast_canvas(self.last_ast)
 
     def _node_label(self, node):
-        base = getattr(node, 'tipo', 'NODE')
-        val = self._node_value(node)
-        return f"{base}\n{val}" if val not in {None, '', 'None'} else base
+        tipo = str(getattr(node, "tipo", "NODE"))
+        valor = self._node_value(node)
+
+        tipo = self._short_node_text(tipo, 20)
+
+        if valor not in {None, "", "None"}:
+            valor = self._short_node_text(str(valor), 22)
+            return f"{tipo}\n'{valor}'"
+
+        return tipo
+    
+    def _short_node_text(self, text, limit=28):
+        text = str(text)
+
+        if len(text) <= limit:
+            return text
+
+        return text[: limit - 1] + "…"
 
     def _node_value(self, node):
         value = getattr(node, 'valor', None)
@@ -899,20 +1079,69 @@ class CompilerGUI:
         return f"{line}:{col}"
 
     def _ast_color(self, node_type):
+        node_type = str(node_type).upper()
+
         if node_type in {"PROGRAM", "STMT_LIST", "BLOCK"}:
+            return "#0f2742"
+
+        if node_type in {"FUNCTION", "FUNCTION_DECL", "FUNCTION_HEADER", "CALL"}:
+            return "#0e3a5b"
+
+        if node_type in {
+            "DECL",
+            "DECL_LIST",
+            "DECL_ARRAY",
+            "DECL_ARRAY_ITEM",
+            "TYPE",
+            "PARAM",
+            "PARAMS",
+            "PARAM_LIST",
+            "RETURN_TYPE",
+        }:
+            return "#164e63"
+
+        if node_type in {
+            "ASSIGN",
+            "ASSIGN_ARRAY",
+            "ARRAY_ASSIGN",
+            "RETURN",
+            "PRINT",
+            "PRINTF",
+            "IF",
+            "ELSE",
+            "WHILE",
+            "FOR",
+            "SWITCH",
+            "CASE",
+            "DEFAULT",
+            "BREAK",
+            "CONTINUE",
+        }:
+            return "#075985"
+
+        if node_type in {
+            "+",
+            "-",
+            "*",
+            "/",
+            "%",
+            "&&",
+            "||",
+            "==",
+            "!=",
+            "<",
+            ">",
+            "<=",
+            ">=",
+            "NEG",
+            "POS",
+            "!",
+        }:
             return "#1d4ed8"
-        if node_type in {"DECL", "DECL_ARRAY", "TYPE"}:
-            return "#047857"
-        if node_type in {"ASSIGN", "ARRAY_ASSIGN"}:
-            return "#b45309"
-        if node_type in {"IF", "WHILE", "FOR", "SWITCH", "CASE", "DEFAULT"}:
-            return "#7e22ce"
-        if node_type in {"CONST", "ID", "ARRAY_ACCESS", "CALL"}:
-            return "#334155"
-        if node_type in {"+", "-", "*", "/", "%", "&&", "||", "==", "!=", "<", ">", "<=", ">=", "NEG", "POS", "!"}:
-            return "#be185d"
-        if node_type in {"FUNCTION", "RETURN", "PRINT", "PRINTF"}:
-            return "#0369a1"
+
+        if node_type in {"CONST", "ID", "ARRAY_ACCESS"}:
+            return "#1e3a5f"
+
         return "#1e293b"
 
     def _round_rect(self, canvas, x1, y1, x2, y2, radius=12, **kwargs):
@@ -927,87 +1156,292 @@ class CompilerGUI:
     # Modern Graphviz export / viewer
     # ---------------------------------------------------------------------
     def export_ast_graphviz_modern(self, ast):
-        if ast is None or not GRAPHVIZ_AVAILABLE:
+        """
+        Genera:
+        - ast_modern.dot
+        - ast_modern.svg   vectorial, máxima calidad
+        - ast_preview.png  imagen raster para mostrar dentro de Tkinter
+        """
+        if ast is None:
+            return
+
+        if not GRAPHVIZ_AVAILABLE:
+            self.append_output("\n[WARN] Graphviz no está disponible. Instala con: brew install graphviz\n")
             return
 
         counter = [0]
+
         lines = [
             "digraph AST {",
-            "    graph [bgcolor=\"#0f172a\", pad=\"0.4\", nodesep=\"0.45\", ranksep=\"0.65\"];",
-            "    node [shape=box, style=\"rounded,filled\", fontname=\"Consolas\", fontsize=11, margin=\"0.14,0.08\", color=\"#93c5fd\", fontcolor=\"#f8fafc\"];",
-            "    edge [color=\"#64748b\", penwidth=1.4, arrowsize=0.7];",
+            "    graph [",
+            "        bgcolor=\"#0f172a\",",
+            "        pad=\"0.45\",",
+            "        nodesep=\"0.42\",",
+            "        ranksep=\"0.72\",",
+            "        splines=\"line\",",
+            "        outputorder=\"edgesfirst\"",
+            "    ];",
+            "",
+            "    node [",
+            "        shape=box,",
+            "        style=\"rounded,filled\",",
+            "        fontname=\"Menlo\",",
+            "        fontsize=12,",
+            "        margin=\"0.16,0.09\",",
+            "        color=\"#7dd3fc\",",
+            "        penwidth=1.6,",
+            "        fontcolor=\"#f8fafc\"",
+            "    ];",
+            "",
+            "    edge [",
+            "        color=\"#46637f\",",
+            "        penwidth=1.25,",
+            "        arrowsize=0.65",
+            "    ];",
+            "",
         ]
 
         def esc(text):
-            return str(text).replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+            return (
+                str(text)
+                .replace("\\", "\\\\")
+                .replace('"', '\\"')
+                .replace("\n", "\\n")
+            )
+
+        def short_text(text, limit=28):
+            text = str(text)
+            if len(text) <= limit:
+                return text
+            return text[: limit - 1] + "…"
+
+        def node_label(node):
+            tipo = short_text(getattr(node, "tipo", "NODE"), 26)
+            value = self._node_value(node)
+
+            if value not in {None, "", "None"}:
+                value = short_text(value, 30)
+                return f"{tipo}\\n'{value}'"
+
+            return tipo
 
         def rec(node):
             node_id = f"n{counter[0]}"
             counter[0] += 1
-            label = getattr(node, 'tipo', 'NODE')
-            value = self._node_value(node)
-            if value:
-                label += f"\\n{esc(value)}"
-            fill = self._ast_color(getattr(node, 'tipo', ''))
-            lines.append(f'    {node_id} [label="{esc(label)}", fillcolor="{fill}"];')
-            for child in getattr(node, 'hijos', []) or []:
+
+            label = node_label(node)
+            fill = self._ast_color(getattr(node, "tipo", ""))
+
+            lines.append(
+                f'    {node_id} [label="{esc(label)}", fillcolor="{fill}"];'
+            )
+
+            for child in getattr(node, "hijos", []) or []:
                 child_id = rec(child)
                 lines.append(f"    {node_id} -> {child_id};")
+
             return node_id
 
         rec(ast)
         lines.append("}")
+
         with open(self.ast_modern_dot_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
+
         try:
-            subprocess.run(["dot", "-Tpng", self.ast_modern_dot_path, "-o", self.ast_modern_png_path], check=True, capture_output=True)
+            # SVG vectorial: este es el archivo de máxima calidad.
+            subprocess.run(
+                [
+                    "dot",
+                    "-Tsvg",
+                    self.ast_modern_dot_path,
+                    "-o",
+                    self.ast_modern_svg_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            # PNG para mostrar dentro de Tkinter.
+            self._render_graphviz_preview_png()
+
         except Exception as exc:
-            self.append_output(f"\n[WARN] No se pudo generar AST moderno con Graphviz: {exc}\n")
+            self.append_output(f"\n[WARN] No se pudo generar AST SVG con Graphviz: {exc}\n")
+
+
+    def _render_graphviz_preview_png(self):
+        """
+        Regenera el PNG de vista previa desde el DOT.
+        No escala una imagen vieja; Graphviz vuelve a renderizar con DPI nuevo.
+        """
+        if not GRAPHVIZ_AVAILABLE:
+            return
+
+        if not os.path.exists(self.ast_modern_dot_path):
+            return
+
+        # 120 dpi base se ve nítido. El zoom modifica el DPI.
+        dpi = max(45, min(260, int(120 * self.graphviz_scale)))
+
+        try:
+            subprocess.run(
+                [
+                    "dot",
+                    "-Tpng",
+                    f"-Gdpi={dpi}",
+                    self.ast_modern_dot_path,
+                    "-o",
+                    self.ast_graphviz_preview_png_path,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except Exception as exc:
+            self.append_output(f"\n[WARN] No se pudo renderizar preview PNG del AST: {exc}\n")
+
 
     def load_graphviz_image(self):
         self.graphviz_canvas.delete("all")
-        path = self.ast_modern_png_path if os.path.exists(self.ast_modern_png_path) else self.ast_png_path
+
+        path = self.ast_graphviz_preview_png_path
+
         if not os.path.exists(path):
-            self.graphviz_canvas.create_text(30, 30, anchor="nw", fill=self.THEME['muted'],
-                                             text="No hay imagen de AST disponible.")
+            self.graphviz_canvas.create_text(
+                30,
+                30,
+                anchor="nw",
+                fill=self.THEME['muted'],
+                text="No hay AST Graphviz disponible.\nCompila código para generar ast_modern.svg."
+            )
             return
+
         if not PILLOW_AVAILABLE:
-            self.graphviz_canvas.create_text(30, 30, anchor="nw", fill=self.THEME['warning'],
-                                             text="Pillow no está instalado. Instala con: pip install Pillow")
+            self.graphviz_canvas.create_text(
+                30,
+                30,
+                anchor="nw",
+                fill=self.THEME['warning'],
+                text="Pillow no está instalado.\nInstala con: python3 -m pip install Pillow"
+            )
             return
+
         try:
             image = Image.open(path)
-            if self.graphviz_scale != 1.0:
-                new_size = (max(1, int(image.width * self.graphviz_scale)), max(1, int(image.height * self.graphviz_scale)))
-                image = image.resize(new_size, Image.Resampling.LANCZOS)
+
             self.ast_graphviz_photo = ImageTk.PhotoImage(image)
-            self.graphviz_canvas.create_image(20, 20, image=self.ast_graphviz_photo, anchor="nw")
-            self.graphviz_canvas.configure(scrollregion=(0, 0, image.width + 40, image.height + 40))
+
+            self.graphviz_canvas.create_image(
+                20,
+                20,
+                image=self.ast_graphviz_photo,
+                anchor="nw"
+            )
+
+            self.graphviz_canvas.configure(
+                scrollregion=(0, 0, image.width + 40, image.height + 40)
+            )
+
         except Exception as exc:
-            self.graphviz_canvas.create_text(30, 30, anchor="nw", fill=self.THEME['error'],
-                                             text=f"Error cargando imagen AST:\n{exc}")
+            self.graphviz_canvas.create_text(
+                30,
+                30,
+                anchor="nw",
+                fill=self.THEME['error'],
+                text=f"Error cargando AST Graphviz:\n{exc}"
+            )
+
 
     def zoom_graphviz(self, factor):
-        self.graphviz_scale = max(0.25, min(3.0, self.graphviz_scale * factor))
+        self.graphviz_scale = max(0.30, min(2.20, self.graphviz_scale * factor))
+
+        if self.last_ast is not None:
+            self._render_graphviz_preview_png()
+
         self.load_graphviz_image()
+
 
     def reset_graphviz_zoom(self):
         self.graphviz_scale = 1.0
+
+        if self.last_ast is not None:
+            self._render_graphviz_preview_png()
+
         self.load_graphviz_image()
 
-    def export_graphviz_image(self):
-        source = self.ast_modern_png_path if os.path.exists(self.ast_modern_png_path) else self.ast_png_path
-        if not os.path.exists(source):
-            messagebox.showinfo("Exportar AST", "Todavía no hay imagen de AST para exportar.")
+
+    def fit_graphviz_to_view(self):
+        """
+        Ajusta el AST al tamaño visible del canvas.
+        Usa una imagen base a escala 1.0 para calcular el factor.
+        """
+        if self.last_ast is None:
             return
+
+        old_scale = self.graphviz_scale
+        self.graphviz_scale = 1.0
+        self._render_graphviz_preview_png()
+
+        if not os.path.exists(self.ast_graphviz_preview_png_path) or not PILLOW_AVAILABLE:
+            self.graphviz_scale = old_scale
+            self.load_graphviz_image()
+            return
+
+        try:
+            image = Image.open(self.ast_graphviz_preview_png_path)
+
+            canvas_w = max(300, self.graphviz_canvas.winfo_width() - 60)
+            canvas_h = max(250, self.graphviz_canvas.winfo_height() - 60)
+
+            scale_x = canvas_w / max(1, image.width)
+            scale_y = canvas_h / max(1, image.height)
+
+            self.graphviz_scale = max(0.30, min(2.20, min(scale_x, scale_y)))
+            self._render_graphviz_preview_png()
+            self.load_graphviz_image()
+
+        except Exception:
+            self.graphviz_scale = old_scale
+            self.load_graphviz_image()
+
+
+    def export_graphviz_svg(self):
+        if not os.path.exists(self.ast_modern_svg_path):
+            messagebox.showinfo("Exportar AST SVG", "Todavía no hay SVG de AST para exportar.")
+            return
+
+        destination = filedialog.asksaveasfilename(
+            title="Guardar AST como SVG",
+            defaultextension=".svg",
+            filetypes=[
+                ("SVG", "*.svg"),
+                ("Todos los archivos", "*.*"),
+            ],
+        )
+
+        if destination:
+            shutil.copyfile(self.ast_modern_svg_path, destination)
+            messagebox.showinfo("Exportar AST SVG", f"AST SVG exportado en:\n{destination}")
+
+
+    def export_graphviz_image(self):
+        if not os.path.exists(self.ast_graphviz_preview_png_path):
+            messagebox.showinfo("Exportar AST PNG", "Todavía no hay imagen de AST para exportar.")
+            return
+
         destination = filedialog.asksaveasfilename(
             title="Guardar AST como PNG",
             defaultextension=".png",
-            filetypes=[("PNG", "*.png"), ("Todos los archivos", "*.*")],
+            filetypes=[
+                ("PNG", "*.png"),
+                ("Todos los archivos", "*.*"),
+            ],
         )
+
         if destination:
-            shutil.copyfile(source, destination)
-            messagebox.showinfo("Exportar AST", f"AST exportado en:\n{destination}")
+            shutil.copyfile(self.ast_graphviz_preview_png_path, destination)
+            messagebox.showinfo("Exportar AST PNG", f"AST PNG exportado en:\n{destination}")
 
     # ---------------------------------------------------------------------
     # Status and output helpers

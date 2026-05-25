@@ -1150,6 +1150,7 @@ def _evaluar_indice_array(indice_nodo):
 def _declarar_array_item(tipo_dato, item):
     nombre_var = item.valor
     tamano_nodo = item.hijos[0]
+    init_nodo = item.hijos[1] if len(item.hijos) > 1 else None
 
     tamano_valor, tamano_tipo = evaluarexpresion(tamano_nodo, con_tipo=True)
 
@@ -1172,13 +1173,38 @@ def _declarar_array_item(tipo_dato, item):
 
     tabla_actual.declarar_array(nombre_var, tipo_dato, tamano, pos_item, 0)
 
+    hijos_ast = [
+        Nodo('TYPE', tipo_dato, linea=item.linea, columna=item.columna),
+        tamano_nodo
+    ]
+
+    if init_nodo is not None:
+        inicializadores = init_nodo.hijos
+
+        if len(inicializadores) != tamano:
+            error_semantico(
+                f"array '{nombre_var}' expects {tamano} initializer(s), got {len(inicializadores)}",
+                nodo=init_nodo
+            )
+
+        for indice_array, expr_nodo in enumerate(inicializadores):
+            valor = evaluarexpresion(expr_nodo)
+
+            tabla_actual.asignar_array(
+                nombre_var,
+                indice_array,
+                valor,
+                pos_item,
+                0,
+                nodo=expr_nodo
+            )
+
+        hijos_ast.append(init_nodo)
+
     return Nodo(
         'DECL_ARRAY',
         nombre_var,
-        [
-            Nodo('TYPE', tipo_dato, linea=item.linea, columna=item.columna),
-            tamano_nodo
-        ],
+        hijos_ast,
         linea=item.linea,
         columna=item.columna
     )
@@ -1323,6 +1349,25 @@ def accion_semantica(produccion, elementos, posiciones=None):
             'DECL_ARRAY_ITEM',
             elementos[0],
             [elementos[2]],
+            linea=linea,
+            columna=columna
+        )
+    
+    elif lhs == "DeclItem" and rhs == ("ID", "[", "E", "]", "=", "{", "InitList", "}"):
+        linea, columna = _pos(posiciones, 0)
+
+        init_list = Nodo(
+            'INIT_LIST',
+            None,
+            elementos[6],
+            linea=linea,
+            columna=columna
+        )
+
+        return Nodo(
+            'DECL_ARRAY_ITEM',
+            elementos[0],
+            [elementos[2], init_list],
             linea=linea,
             columna=columna
         )
@@ -1973,6 +2018,12 @@ def accion_semantica(produccion, elementos, posiciones=None):
             elementos[2],
             posiciones
     )
+
+    elif lhs == "InitList" and rhs == ("E",):
+        return [elementos[0]]
+
+    elif lhs == "InitList" and rhs == ("InitList", ",", "E"):
+        return elementos[0] + [elementos[2]]
 
     error_semantico(
         f"semantic action not implemented for production: {lhs} -> {' '.join(rhs)}",
