@@ -2,10 +2,6 @@ from .parsertable import tabla_action, tabla_goto, productions
 from .sdt import tabla_simbolos, tabla_funciones, accion_semantica, imprimir_arbol, exportar_arbol_graphviz, reset_semantica, entrar_ambito, salir_ambito
 import traceback
 
-ultimo_ast = None
-ultimo_resultado = None
-
-
 def mapear_tokens(tokens):
     simbolos = []
     lexemas = []
@@ -121,15 +117,7 @@ def mapear_tokens(tokens):
     posiciones.append((None, None))
     return simbolos, lexemas, posiciones
 
-def analizar(tokens, ast_base_path="ast"):
-    global ultimo_ast, ultimo_resultado
-    ultimo_ast = None
-    ultimo_resultado = {
-        "ok": False,
-        "fase": None,
-        "error": None,
-        "ast": None,
-    }
+def analizar(tokens):
     reset_semantica()
 
     try:
@@ -141,7 +129,6 @@ def analizar(tokens, ast_base_path="ast"):
         print(f"Token mapping error: {e}")
         traceback.print_exc()
         print("Parsing error...")
-        ultimo_resultado = {"ok": False, "fase": "lexer/parser mapping", "error": str(e), "ast": None}
         return False
 
     pila = [0]
@@ -170,13 +157,6 @@ def analizar(tokens, ast_base_path="ast"):
             print(f"Syntax error at line {linea}, column {columna}")
             print(f"Unexpected token: '{lexemas[pos]}'")
             print(f"Expected one of: {esperados}")
-            ultimo_resultado = {
-                "ok": False,
-                "fase": "syntax",
-                "error": f"Syntax error at line {linea}, column {columna}: unexpected '{lexemas[pos]}'",
-                "expected": esperados,
-                "ast": None,
-            }
             return False
 
         if accion.startswith('S'):
@@ -226,7 +206,6 @@ def analizar(tokens, ast_base_path="ast"):
 
             if lhs not in tabla_goto.get(estado_expuesto, {}):
                 print("Parsing error...")
-                ultimo_resultado = {"ok": False, "fase": "syntax", "error": "Missing GOTO transition", "ast": None}
                 return False
             
             siguiente = tabla_goto[estado_expuesto][lhs]
@@ -249,16 +228,7 @@ def analizar(tokens, ast_base_path="ast"):
                 print("Parse/AST tree:")
                 imprimir_arbol(pila_sem[-1])
 
-                ultimo_ast = pila_sem[-1]
-                exportar_arbol_graphviz(ultimo_ast, ast_base_path)
-                ultimo_resultado = {
-                    "ok": True,
-                    "fase": "semantic",
-                    "error": None,
-                    "ast": ultimo_ast,
-                    "symbol_table": tabla_simbolos.simbolos,
-                    "function_table": tabla_funciones.funciones,
-                }
+                exportar_arbol_graphviz(pila_sem[-1], "ast")
 
                 return True
             
@@ -266,22 +236,8 @@ def analizar(tokens, ast_base_path="ast"):
                 print("SDT error...")
                 if sdt_error:
                     print(sdt_error)
-                ultimo_resultado = {
-                    "ok": False,
-                    "fase": "semantic",
-                    "error": sdt_error,
-                    "ast": pila_sem[-1] if pila_sem else None,
-                }
                 return False
             
         else:
             print("Parsing error...")
             return False
-
-def obtener_ultimo_resultado():
-    """Devuelve el resultado detallado de la última ejecución del parser.
-
-    Mantiene compatibilidad con el flujo anterior: analizar(tokens) sigue
-    regresando True/False, pero la GUI puede consultar aquí el AST y metadatos.
-    """
-    return ultimo_resultado
