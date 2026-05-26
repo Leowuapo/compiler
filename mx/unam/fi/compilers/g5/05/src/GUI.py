@@ -107,7 +107,7 @@ class CompilerGUI:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("Team 05 Compiler")
+        self.root.title("PENTA Compiler")
         self.root.geometry("1500x860")
         self.root.minsize(1180, 720)
         self.code_font_family = self._select_code_font()
@@ -122,6 +122,8 @@ class CompilerGUI:
         self.last_ast = None
         self.ast_photo = None
         self.ast_graphviz_photo = None
+        self.team_logo_photo = None
+        self.team_logo_path = os.path.join(SRC_ROOT, "assets", "logo.png")
         self.current_file_path = None
         self.outputs_root = os.path.join(SRC_ROOT, "outputs")
         self.current_output_dir = None
@@ -144,6 +146,21 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # Layout
     # ---------------------------------------------------------------------
+    def _load_team_logo(self, max_size=(96, 96)):
+        if not PILLOW_AVAILABLE:
+            return None
+
+        if not os.path.exists(self.team_logo_path):
+            return None
+
+        try:
+            image = Image.open(self.team_logo_path)
+            image.thumbnail(max_size)
+            self.team_logo_photo = ImageTk.PhotoImage(image)
+            return self.team_logo_photo
+        except Exception:
+            return None
+    
 
     def _select_code_font(self):
         preferred_fonts = [
@@ -204,26 +221,45 @@ class CompilerGUI:
 
         header = ctk.CTkFrame(self.root, fg_color=self.THEME['panel'], corner_radius=18)
         header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=16, pady=(16, 8))
-        header.grid_columnconfigure(0, weight=1)
-        header.grid_columnconfigure(1, weight=0)
+        header.grid_columnconfigure(0, weight=0)
+        header.grid_columnconfigure(1, weight=1)
+        header.grid_columnconfigure(2, weight=0)
+
+        logo = self._load_team_logo()
+        if logo is not None:
+            logo_label = tk.Label(
+                header,
+                image=logo,
+                bg=self.THEME['panel'],
+                borderwidth=0,
+                highlightthickness=0,
+            )
+            logo_label.grid(row=0, column=0, sticky="w", padx=(18, 10), pady=10)
+        else:
+            ctk.CTkLabel(
+                header,
+                text="PENTA\ncode",
+                font=("Arial", 20, "bold"),
+                text_color=self.THEME['accent'],
+            ).grid(row=0, column=0, sticky="w", padx=(18, 10), pady=10)
 
         title_box = ctk.CTkFrame(header, fg_color="transparent")
-        title_box.grid(row=0, column=0, sticky="w", padx=18, pady=14)
+        title_box.grid(row=0, column=1, sticky="w", padx=8, pady=14)
         ctk.CTkLabel(
             title_box,
-            text="Team 05 Compiler",
+            text="PENTA Compiler",
             font=("Segoe UI", 24, "bold"),
             text_color=self.THEME['text'],
         ).pack(anchor="w")
         ctk.CTkLabel(
             title_box,
-            text="Léxico · Sintáctico · Semántico · TAC · Optimización · Target Code",
+            text="Lexical · Syntax · Semantic · TAC · Optimization · Target Code",
             font=("Segoe UI", 13),
             text_color=self.THEME['muted'],
         ).pack(anchor="w", pady=(3, 0))
 
         self.stage_container = ctk.CTkFrame(header, fg_color="transparent")
-        self.stage_container.grid(row=0, column=1, sticky="e", padx=18, pady=12)
+        self.stage_container.grid(row=0, column=2, sticky="e", padx=18, pady=12)
         self.stage_cards = {}
         for idx, key in enumerate(["lexico", "sintactico", "semantico"]):
             card = ctk.CTkFrame(self.stage_container, fg_color=self.THEME['panel_2'], corner_radius=14)
@@ -242,7 +278,7 @@ class CompilerGUI:
         editor_header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             editor_header,
-            text="Editor de código",
+            text="Code editor",
             font=("Segoe UI", 17, "bold"),
             text_color=self.THEME['text'],
         ).grid(row=0, column=0, sticky="w")
@@ -256,12 +292,12 @@ class CompilerGUI:
         buttons = ctk.CTkFrame(left, fg_color="transparent")
         buttons.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
         buttons.grid_columnconfigure((0, 1, 2), weight=1)
-        self._primary_button(buttons, "Compilar todo", self.compile_code).grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=4)
-        self._secondary_button(buttons, "Solo léxico", self.run_lexer_only).grid(row=0, column=1, sticky="ew", padx=6, pady=4)
+        self._primary_button(buttons, "Compile All", self.compile_code).grid(row=0, column=0, sticky="ew", padx=(0, 6), pady=4)
+        self._secondary_button(buttons, "Lexical Only", self.run_lexer_only).grid(row=0, column=1, sticky="ew", padx=6, pady=4)
         self._secondary_button(buttons, "Parser + SDT", self.run_parser_sdt_only).grid(row=0, column=2, sticky="ew", padx=(6, 0), pady=4)
-        self._secondary_button(buttons, "Abrir", self.open_file).grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=4)
-        self._secondary_button(buttons, "Guardar", self.save_file).grid(row=1, column=1, sticky="ew", padx=6, pady=4)
-        self._danger_button(buttons, "Limpiar", self.clear_all).grid(row=1, column=2, sticky="ew", padx=(6, 0), pady=4)
+        self._secondary_button(buttons, "Open file", self.open_file).grid(row=1, column=0, sticky="ew", padx=(0, 6), pady=4)
+        self._secondary_button(buttons, "Save", self.save_file).grid(row=1, column=1, sticky="ew", padx=6, pady=4)
+        self._danger_button(buttons, "Clear", self.clear_all).grid(row=1, column=2, sticky="ew", padx=(6, 0), pady=4)
 
         editor_shell = ctk.CTkFrame(left, fg_color=self.THEME['panel_2'], corner_radius=14)
         editor_shell.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 16))
@@ -318,20 +354,20 @@ class CompilerGUI:
         result_header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
             result_header,
-            text="Resultados del compilador",
+            text="Results of compilation",
             font=("Segoe UI", 17, "bold"),
             text_color=self.THEME['text'],
         ).grid(row=0, column=0, sticky="w")
         self.grammar_button = self._secondary_button(
             result_header,
-            "Gramática",
+            "Grammar",
             self.show_grammar_window,
         )
         self.grammar_button.grid(row=0, column=1, sticky="e", padx=(0, 8))
 
         self.status_label = ctk.CTkLabel(
             result_header,
-            text="Listo",
+            text="Ready",
             font=("Segoe UI", 12, "bold"),
             text_color=self.THEME['success'],
         )
@@ -354,15 +390,15 @@ class CompilerGUI:
 
         self.tac_summary_label, self.tac_tree = self._make_instruction_view(
             self.tabs.tab("TAC"),
-            "Compila código para generar TAC."
+            "Compile code to generate TAC."
         )
         self.tac_optimized_summary_label, self.tac_optimized_tree = self._make_instruction_view(
             self.tabs.tab("TAC Optimized"),
-            "Compila código para generar TAC optimizado."
+            "Compile code to generate optimized TAC."
         )
         self.target_summary_label, self.target_tree = self._make_instruction_view(
             self.tabs.tab("Target Code"),
-            "Compila código para generar target code."
+            "Compile code to generate target code."
         )
 
         self.vm_summary_label, self.vm_output_text = self._make_vm_output_view(
@@ -370,21 +406,21 @@ class CompilerGUI:
         )
 
         self.token_tree = self._make_tree(self.tabs.tab("Tokens"), ("tipo", "lexema", "linea", "columna"))
-        self._heading(self.token_tree, "tipo", "Tipo", 130)
-        self._heading(self.token_tree, "lexema", "Lexema", 260)
-        self._heading(self.token_tree, "linea", "Línea", 80)
-        self._heading(self.token_tree, "columna", "Columna", 90)
+        self._heading(self.token_tree, "tipo", "Type", 130)
+        self._heading(self.token_tree, "lexema", "Lexeme", 260)
+        self._heading(self.token_tree, "linea", "Line", 80)
+        self._heading(self.token_tree, "columna", "Column", 90)
 
         self.symbol_tree = self._make_tree(self.tabs.tab("Symbol Table"), ("nombre", "tipo", "valor", "detalle"))
-        self._heading(self.symbol_tree, "nombre", "Nombre", 170)
-        self._heading(self.symbol_tree, "tipo", "Tipo", 120)
-        self._heading(self.symbol_tree, "valor", "Valor", 260)
-        self._heading(self.symbol_tree, "detalle", "Detalle", 170)
+        self._heading(self.symbol_tree, "nombre", "Name", 170)
+        self._heading(self.symbol_tree, "tipo", "Type", 120)
+        self._heading(self.symbol_tree, "valor", "Value", 260)
+        self._heading(self.symbol_tree, "detalle", "Detail", 170)
 
         self.function_tree = self._make_tree(self.tabs.tab("Function Table"), ("nombre", "retorno", "parametros"))
-        self._heading(self.function_tree, "nombre", "Función", 180)
-        self._heading(self.function_tree, "retorno", "Retorno", 120)
-        self._heading(self.function_tree, "parametros", "Parámetros", 420)
+        self._heading(self.function_tree, "nombre", "Function", 180)
+        self._heading(self.function_tree, "retorno", "Return", 120)
+        self._heading(self.function_tree, "parametros", "Parameters", 420)
 
         self._build_graphviz_tab()
 
@@ -423,8 +459,8 @@ class CompilerGUI:
         self._small_button(toolbar, "SVG +", lambda: self.zoom_graphviz(1.15)).pack(side="left", padx=3)
         self._small_button(toolbar, "Fit", self.fit_graphviz_to_view).pack(side="left", padx=3)
         self._small_button(toolbar, "Reset", self.reset_graphviz_zoom).pack(side="left", padx=3)
-        self._small_button(toolbar, "Exportar SVG", self.export_graphviz_svg).pack(side="left", padx=3)
-        self._small_button(toolbar, "Abrir SVG", self.open_graphviz_svg).pack(side="left", padx=3)
+        self._small_button(toolbar, "Export SVG", self.export_graphviz_svg).pack(side="left", padx=3)
+        self._small_button(toolbar, "Open SVG", self.open_graphviz_svg).pack(side="left", padx=3)
 
         shell = ctk.CTkFrame(tab, fg_color=self.THEME['panel_2'])
         shell.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
@@ -458,7 +494,7 @@ class CompilerGUI:
             30,
             anchor="nw",
             fill=self.THEME['muted'],
-            text="Compila código para generar el AST Tree."
+            text="Compile code to generate the AST Tree."
         )
 
     def _make_textbox(self, parent):
@@ -625,8 +661,8 @@ class CompilerGUI:
         output.tag_config("accent", foreground=self.THEME['accent'])
         output.tag_config("prompt", foreground=self.THEME['green'])
 
-        self._set_vm_summary(summary, "VM Output: compila código para ejecutar la VM.", self.THEME['muted'])
-        output.insert("1.0", "Compila código para ver aquí la salida explícita de la VM.")
+        self._set_vm_summary(summary, "VM Output: compile code to run the VM.", self.THEME['muted'])
+        output.insert("1.0", "Compile code to see the explicit output of the VM here.")
         output.configure(state="disabled")
 
         return summary, output
@@ -2146,7 +2182,7 @@ class CompilerGUI:
                 30,
                 anchor="nw",
                 fill=self.THEME['muted'],
-                text="No hay AST Tree disponible.\nCompila código para generar ast_modern.svg."
+                text="No hay AST Tree disponible.\nCompile code to generate ast_modern.svg."
             )
             return
 
@@ -2323,7 +2359,7 @@ class CompilerGUI:
         self.set_stage("semantico", "idle")
 
     def set_stage(self, stage, state):
-        names = {"lexico": "Léxico", "sintactico": "Sintáctico", "semantico": "Semántico"}
+        names = {"lexico": "Lexical", "sintactico": "Syntax", "semantico": "Semantic"}
         icons = {"idle": "○", "pending": "…", "success": "✓", "error": "✕"}
         colors = {
             "idle": self.THEME['muted'],
@@ -2373,9 +2409,9 @@ class CompilerGUI:
 
     def set_placeholder_texts(self):
         instruction_placeholders = [
-            (self.tac_tree, self.tac_summary_label, "TAC", "Compila código para generar TAC."),
-            (self.tac_optimized_tree, self.tac_optimized_summary_label, "TAC Optimized", "Compila código para generar TAC optimizado."),
-            (self.target_tree, self.target_summary_label, "Target Code", "Compila código para generar target code."),
+            (self.tac_tree, self.tac_summary_label, "TAC", "Compile code to generate TAC."),
+            (self.tac_optimized_tree, self.tac_optimized_summary_label, "TAC Optimized", "Compile code to generate optimized TAC."),
+            (self.target_tree, self.target_summary_label, "Target Code", "Compile code to generate target code."),
         ]
         for tree, summary_label, title, message in instruction_placeholders:
             self._insert_instruction_placeholder(tree, message)
@@ -2384,12 +2420,12 @@ class CompilerGUI:
         if hasattr(self, "vm_output_text"):
             self._set_vm_summary(
                 self.vm_summary_label,
-                "VM Output: compila código para ejecutar la VM.",
+                "VM Output: compile code to run the VM.",
                 self.THEME['muted'],
             )
             self.vm_output_text.configure(state="normal")
             self.vm_output_text.delete("1.0", tk.END)
-            self.vm_output_text.insert("1.0", "Compila código para ver aquí la salida explícita de la VM.")
+            self.vm_output_text.insert("1.0", "Compile code to see the explicit output of the VM here.")
             self.vm_output_text.configure(state="disabled")
 
         if hasattr(self, "graphviz_canvas"):
@@ -2399,7 +2435,7 @@ class CompilerGUI:
                 30,
                 anchor="nw",
                 fill=self.THEME['muted'],
-                text="Compila código para generar el AST Tree."
+                text="Compile code to generate the AST Tree."
             )
 
     # ---------------------------------------------------------------------
@@ -2467,12 +2503,12 @@ class CompilerGUI:
         js = """
         const search=document.querySelector('#search');const cards=[...document.querySelectorAll('.grammar-card')];const rows=[...document.querySelectorAll('tbody tr')];const count=document.querySelector('#visible-count');function applyFilter(){const q=search.value.trim().toLowerCase();let visible=0;cards.forEach(card=>{const cardMatch=card.dataset.search.includes(q);const alts=[...card.querySelectorAll('.alt')];let visibleAlts=0;alts.forEach(alt=>{const ok=!q||cardMatch||alt.dataset.search.includes(q);alt.classList.toggle('hidden',!ok);if(ok)visibleAlts++});const show=visibleAlts>0;card.classList.toggle('hidden',!show);if(show)visible++});rows.forEach(row=>row.classList.toggle('hidden',q&&!row.dataset.search.includes(q)));count.textContent=visible}search.addEventListener('input',applyFilter);applyFilter();
         """
-        doc = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Gramática actual - Team 05 Compiler</title><style>{css}</style></head><body><div class="page"><header><h1>Gramática actual</h1><p class="subtitle">Producciones compactas desde <code>parser_sdt/parsertable.py</code>.</p><div class="stats"><div class="stat"><strong>{len(productions)}</strong> producciones</div><div class="stat"><strong>{len(grouped)}</strong> no terminales con reglas</div><div class="stat"><strong>{len(terminales)}</strong> terminales</div><div class="stat"><strong>{len(no_terminales)}</strong> no terminales</div><div class="stat"><strong id="visible-count">{len(grouped)}</strong> grupos visibles</div></div></header><div class="toolbar"><input id="search" type="search" placeholder="Buscar: FunctionDecl, return, E, printf, array..."></div><div class="legend"><span class="pill"><span class="nonterminal">No terminal</span></span><span class="pill"><span class="terminal">Terminal</span></span><span class="pill"><span class="epsilon">ε</span> producción vacía</span></div><main class="grid">{"".join(cards)}</main><details><summary>Ver tabla lineal de producciones</summary><table><thead><tr><th>#</th><th>LHS</th><th></th><th>RHS</th></tr></thead><tbody>{"".join(table_rows)}</tbody></table></details></div><script>{js}</script></body></html>"""
+        doc = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Gramática actual - PENTA Compiler</title><style>{css}</style></head><body><div class="page"><header><h1>Gramática actual</h1><p class="subtitle">Producciones compactas desde <code>parser_sdt/parsertable.py</code>.</p><div class="stats"><div class="stat"><strong>{len(productions)}</strong> producciones</div><div class="stat"><strong>{len(grouped)}</strong> no terminales con reglas</div><div class="stat"><strong>{len(terminales)}</strong> terminales</div><div class="stat"><strong>{len(no_terminales)}</strong> no terminales</div><div class="stat"><strong id="visible-count">{len(grouped)}</strong> grupos visibles</div></div></header><div class="toolbar"><input id="search" type="search" placeholder="Buscar: FunctionDecl, return, E, printf, array..."></div><div class="legend"><span class="pill"><span class="nonterminal">No terminal</span></span><span class="pill"><span class="terminal">Terminal</span></span><span class="pill"><span class="epsilon">ε</span> producción vacía</span></div><main class="grid">{"".join(cards)}</main><details><summary>Ver tabla lineal de producciones</summary><table><thead><tr><th>#</th><th>LHS</th><th></th><th>RHS</th></tr></thead><tbody>{"".join(table_rows)}</tbody></table></details></div><script>{js}</script></body></html>"""
 
         with open(grammar_path, "w", encoding="utf-8") as f:
             f.write(doc)
 
-        self.update_status(f"Gramática exportada: {os.path.basename(grammar_path)}", "success")
+        self.update_status(f"Grammar exported: {os.path.basename(grammar_path)}", "success")
         self._open_path_in_browser(grammar_path)
 
     def _open_path_in_browser(self, path):
