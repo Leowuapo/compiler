@@ -27,10 +27,12 @@ productions = [
     ("DeclItem", ["ID", "=", "E"]),
     ("DeclItem", ["ID", "[", "E", "]"]),
     ("DeclItem", ["ID", "[", "E", "]", "=", "{", "InitList", "}"]),
+    ("DeclItem", ["ID", "[", "E", "]", "[", "E", "]"]),
     
     # Asignación (variable ya declarada)
     ("Assignment", ["ID", "=", "E"]),
     ("Assignment", ["ArrayAccess", "=", "E"]),
+    ("Assignment", ["MatrixAccess", "=", "E"]),
     
     # Bloque con ámbito
     ("Block", ["{", "StatementList", "}"]),
@@ -75,6 +77,7 @@ productions = [
     ("Primary", ["CONST"]),
     ("Primary", ["FunctionCall"]),
     ("Primary", ["ArrayAccess"]),
+    ("Primary", ["MatrixAccess"]),
 
     # If / else
     ("Statement", ["IfStatement"]),
@@ -166,6 +169,9 @@ productions = [
     # Acceso a arreglos
     ("ArrayAccess", ["ID", "[", "E", "]"]),
 
+    # Acceso a matrices
+    ("MatrixAccess", ["ID", "[", "E", "]", "[", "E", "]"]),
+
     # Inicialización de arreglos
     ("InitList", ["E"]),
     ("InitList", ["InitList", ",", "E"]),
@@ -193,7 +199,7 @@ no_terminales = {
     "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
-    "ArrayAccess", "InitList",
+    "ArrayAccess", "MatrixAccess", "InitList",
     "IfStatement", "WhileStatement", 
     "ForStatement", "ForInit", "ForUpdate",
     "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",
