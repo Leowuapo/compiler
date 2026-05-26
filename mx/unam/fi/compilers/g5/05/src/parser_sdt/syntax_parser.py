@@ -1,6 +1,7 @@
 from .parsertable import tabla_action, tabla_goto, productions
 from .sdt import tabla_simbolos, tabla_funciones, accion_semantica, imprimir_arbol, exportar_arbol_graphviz, reset_semantica, entrar_ambito, salir_ambito
 from backend.tac import generar_tac, imprimir_tac, guardar_tac
+from backend.optimizer import optimizar_tac, imprimir_tac_optimizado, guardar_tac_optimizado
 import traceback
 
 ultimo_ast = None
@@ -258,6 +259,11 @@ def analizar(tokens, ast_base_path="ast"):
                 imprimir_tac(tac)
                 guardar_tac(tac, "tac.ir")
 
+                print("Optimized TAC:")
+                tac_optimizado = optimizar_tac(tac)
+                imprimir_tac_optimizado(tac_optimizado)
+                guardar_tac_optimizado(tac_optimizado, "tac_optimized.ir")
+
                 ultimo_resultado = {
                     "ok": True,
                     "fase": "semantic",
@@ -266,6 +272,7 @@ def analizar(tokens, ast_base_path="ast"):
                     "symbol_table": tabla_simbolos.simbolos,
                     "function_table": tabla_funciones.funciones,
                     "tac": tac,
+                    "tac_optimized": tac_optimizado,
                 }
 
                 return True
