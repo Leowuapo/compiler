@@ -2,6 +2,8 @@ from .parsertable import tabla_action, tabla_goto, productions
 from .sdt import tabla_simbolos, tabla_funciones, accion_semantica, imprimir_arbol, exportar_arbol_graphviz, reset_semantica, entrar_ambito, salir_ambito
 from backend.tac import generar_tac, imprimir_tac, guardar_tac
 from backend.optimizer import optimizar_tac, imprimir_tac_optimizado, guardar_tac_optimizado
+from backend.target_code import generar_target_code, imprimir_target_code, guardar_target_code
+from backend.vm import ejecutar_target_code
 import traceback
 
 ultimo_ast = None
@@ -264,6 +266,19 @@ def analizar(tokens, ast_base_path="ast"):
                 imprimir_tac_optimizado(tac_optimizado)
                 guardar_tac_optimizado(tac_optimizado, "tac_optimized.ir")
 
+                print("Target Code:")
+                target_code = generar_target_code(tac_optimizado)
+                imprimir_target_code(target_code)
+                guardar_target_code(target_code, "target_code.asm")
+
+                vm_resultado = None
+
+                if any(instr.op == "FUNC" and instr.args[0] == "main" for instr in target_code):
+                    print("VM Execution:")
+                    vm_resultado = ejecutar_target_code(target_code, entry_point="main", mostrar_salida=True)
+                else:
+                    print("VM Execution skipped: main function not found")
+
                 ultimo_resultado = {
                     "ok": True,
                     "fase": "semantic",
@@ -273,6 +288,8 @@ def analizar(tokens, ast_base_path="ast"):
                     "function_table": tabla_funciones.funciones,
                     "tac": tac,
                     "tac_optimized": tac_optimizado,
+                    "target_code": target_code,
+                    "vm_resultado": vm_resultado,
                 }
 
                 return True

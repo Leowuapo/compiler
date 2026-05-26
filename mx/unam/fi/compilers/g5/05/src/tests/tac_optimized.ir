@@ -1,40 +1,115 @@
-func BasicLoopUnrolling:
+func suma:
+param a
+param b
+t1 = a + b
+return t1
+end func suma
+func cuadrado:
+param x
+t2 = x * x
+return t2
+end func cuadrado
+func max2:
+param a
+param b
+t3 = a > b
+ifFalse t3 goto else1
+return a
+else1:
+return b
+end func max2
+func acum_for:
 total = 0
 i = 0
 total = 0
 total = 1
 total = 3
-i = 3
-return 3
-end func BasicLoopUnrolling
-func LargeLoopUnrolling:
-total = 0
+total = 6
+i = 4
+return 6
+end func acum_for
+func acum_while:
+param limite
 i = 0
-for4:
-t3 = i < 20
-ifFalse t3 goto endfor6
-t4 = total + i
-total = t4
-i = i + 1
-goto for4
-endfor6:
-return total
-end func LargeLoopUnrolling
-func LoopWithContinue:
 total = 0
-i = 0
-for7:
-t5 = i < 3
-ifFalse t5 goto endfor9
-t6 = i == 1
-ifFalse t6 goto endif10
-goto for_update8
-endif10:
+while6:
+t6 = i < limite
+ifFalse t6 goto endwhile7
 t7 = total + i
 total = t7
-for_update8:
-i = i + 1
-goto for7
-endfor9:
+t8 = i + 1
+i = t8
+goto while6
+endwhile7:
 return total
-end func LoopWithContinue
+end func acum_while
+func es_valido:
+param x
+t9 = x > 10
+t10 = x < 50
+t11 = t9 && t10
+return t11
+end func es_valido
+func imprimir_valor:
+param v
+printf 'valor=%d', v
+end func imprimir_valor
+func main:
+arg 10
+arg 5
+t12 = call suma, 2
+a = t12
+arg 4
+t13 = call cuadrado, 1
+b = t13
+arg a
+arg b
+t14 = call max2, 2
+c = t14
+t15 = call acum_for, 0
+total_for = t15
+arg 4
+t16 = call acum_while, 1
+total_while = t16
+arr[0] = 1
+arr[1] = 2
+arr[2] = 3
+arr[3] = 4
+m[0][0] = a
+m[0][1] = b
+t17 = arr[0]
+t18 = arr[1]
+t19 = t17 + t18
+m[1][0] = t19
+t20 = arr[2]
+t21 = arr[3]
+t22 = t20 + t21
+m[1][1] = t22
+t23 = m[0][0]
+t24 = m[0][1]
+t25 = t23 + t24
+t26 = m[1][0]
+t27 = t25 + t26
+t28 = m[1][1]
+t29 = t27 + t28
+matriz_total = t29
+arg matriz_total
+t30 = call es_valido, 1
+ok = t30
+ifFalse ok goto else8
+printf 'matriz_total=%d', matriz_total
+goto endif9
+else8:
+printf 'matriz_total_invalido=%d', matriz_total
+endif9:
+arg c
+call imprimir_valor, 1
+t31 = matriz_total + total_for
+t32 = t31 + total_while
+resultado = t32
+printf 'a=%d b=%d c=%d', a, b, c
+printf 'for=%d while=%d', total_for, total_while
+printf 'resultado=%d', resultado
+print resultado
+return resultado
+end func main
