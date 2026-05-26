@@ -1,45 +1,40 @@
-func prueba_constantes:
-x = 14
-y = 14
-z = 14
-print 14
-return 14
-end func prueba_constantes
-func prueba_branch:
-print 2
-return 0
-end func prueba_branch
-func prueba_temporales:
-x = 10
-y = 10
-z = 10
-return 10
-end func prueba_temporales
-func prueba_for:
+func BasicLoopUnrolling:
+total = 0
+i = 0
+total = 0
+total = 1
+total = 3
+i = 3
+return 3
+end func BasicLoopUnrolling
+func LargeLoopUnrolling:
 total = 0
 i = 0
 for4:
-t5 = i < 3
-ifFalse t5 goto endfor6
-t6 = total + i
-total = t6
+t3 = i < 20
+ifFalse t3 goto endfor6
+t4 = total + i
+total = t4
 i = i + 1
 goto for4
 endfor6:
 return total
-end func prueba_for
-func main:
-t7 = call prueba_constantes, 0
-a = t7
-t8 = call prueba_branch, 0
-b = t8
-t9 = call prueba_temporales, 0
-c = t9
-t10 = call prueba_for, 0
-d = t10
-printf 'a=%d b=%d c=%d d=%d', a, b, c, d
-t11 = a + b
-t12 = t11 + c
-t13 = t12 + d
-return t13
-end func main
+end func LargeLoopUnrolling
+func LoopWithContinue:
+total = 0
+i = 0
+for7:
+t5 = i < 3
+ifFalse t5 goto endfor9
+t6 = i == 1
+ifFalse t6 goto endif10
+goto for_update8
+endif10:
+t7 = total + i
+total = t7
+for_update8:
+i = i + 1
+goto for7
+endfor9:
+return total
+end func LoopWithContinue

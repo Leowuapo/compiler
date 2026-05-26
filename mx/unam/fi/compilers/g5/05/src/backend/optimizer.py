@@ -690,8 +690,362 @@ def remove_dead_temporaries(instructions):
 # ------------------------------------------------------------
 # Pipeline principal
 # ------------------------------------------------------------
+def _as_int_constant(value):
+    value = _parse_literal(value)
+
+    if isinstance(value, bool):
+        return int(value)
+
+    if isinstance(value, int):
+        return value
+
+    return None
+
+
+def _value_contains_temp(value):
+    if _is_temp(value):
+        return True
+
+    if isinstance(value, tuple):
+        return any(_value_contains_temp(v) for v in value)
+
+    if isinstance(value, list):
+        return any(_value_contains_temp(v) for v in value)
+
+    return False
+
+
+def _max_temp_index(instructions):
+    max_index = 0
+
+    def scan(value):
+        nonlocal max_index
+
+        if _is_temp(value):
+            max_index = max(max_index, int(value[1:]))
+
+        elif isinstance(value, tuple):
+            for item in value:
+                scan(item)
+
+        elif isinstance(value, list):
+            for item in value:
+                scan(item)
+
+    for instr in instructions:
+        scan(instr.arg1)
+        scan(instr.arg2)
+        scan(instr.result)
+
+    return max_index
+
+
+def _find_label(instructions, label, start):
+    for i in range(start, len(instructions)):
+        if instructions[i].op == "LABEL" and instructions[i].result == label:
+            return i
+
+    return None
+
+
+def _last_goto_to_label(instructions, label, start, end):
+    result = None
+
+    for i in range(start, end):
+        if instructions[i].op == "GOTO" and instructions[i].result == label:
+            result = i
+
+    return result
+
+
+def _compute_iteration_count(start, bound, cmp_op, step):
+    if step == 0:
+        return None
+
+    if cmp_op == "<" and step > 0:
+        return max(0, bound - start)
+
+    if cmp_op == "<=" and step > 0:
+        return max(0, bound - start + 1)
+
+    if cmp_op == ">" and step < 0:
+        return max(0, start - bound)
+
+    if cmp_op == ">=" and step < 0:
+        return max(0, start - bound + 1)
+
+    return None
+
+
+def _replace_value_for_unroll(value, induction_var, induction_value, temp_map):
+    if value == induction_var:
+        return induction_value
+
+    if _is_temp(value) and value in temp_map:
+        return temp_map[value]
+
+    if isinstance(value, tuple):
+        return tuple(
+            _replace_value_for_unroll(v, induction_var, induction_value, temp_map)
+            for v in value
+        )
+
+    if isinstance(value, list):
+        return [
+            _replace_value_for_unroll(v, induction_var, induction_value, temp_map)
+            for v in value
+        ]
+
+    return value
+
+
+def _clone_instruction_for_unroll(instr, induction_var, induction_value, temp_map, temp_counter):
+    def fresh_temp():
+        temp_counter[0] += 1
+        return f"t{temp_counter[0]}"
+
+    new_result = instr.result
+
+    defs = _defs(instr)
+
+    for defined in defs:
+        if _is_temp(defined):
+            if defined not in temp_map:
+                temp_map[defined] = fresh_temp()
+
+    new_arg1 = _replace_value_for_unroll(instr.arg1, induction_var, induction_value, temp_map)
+    new_arg2 = _replace_value_for_unroll(instr.arg2, induction_var, induction_value, temp_map)
+    new_result = _replace_value_for_unroll(instr.result, induction_var, induction_value, temp_map)
+
+    return TACInstruction(instr.op, new_arg1, new_arg2, new_result)
+
+
+def _body_is_safe_to_unroll(body, induction_var):
+    """
+    Unrolling conservador:
+    - No desenrolla si hay control-flow interno.
+    - No desenrolla si el cuerpo modifica la variable de inducción.
+    """
+
+    forbidden_ops = {
+        "LABEL", "GOTO", "IF_FALSE", "IF_TRUE", "RETURN"
+    }
+
+    for instr in body:
+        if instr.op in forbidden_ops:
+            return False
+
+        if induction_var in _defs(instr):
+            return False
+
+    return True
+
+
+def loop_unrolling(instructions, max_unroll=8):
+    """
+    Loop unrolling para for-loops simples.
+
+    Detecta patrones TAC como:
+
+        i = 0
+        for1:
+        t1 = i < 3
+        ifFalse t1 goto endfor3
+        cuerpo
+        for_update2:
+        i = i + 1
+        goto for1
+        endfor3:
+
+    Y los transforma en:
+
+        i = 0
+        cuerpo con i = 0
+        cuerpo con i = 1
+        cuerpo con i = 2
+        i = 3
+
+    Solo aplica cuando:
+    - inicio es constante entera
+    - límite es constante entero
+    - step es constante entero
+    - cuerpo no tiene control-flow interno
+    - número de iteraciones <= max_unroll
+    """
+
+    optimized = []
+    i = 0
+    temp_counter = [_max_temp_index(instructions)]
+
+    while i < len(instructions):
+        # Buscamos:
+        # ASSIGN i = const
+        # LABEL forN
+        if (
+            i + 4 < len(instructions)
+            and instructions[i].op == "ASSIGN"
+            and instructions[i + 1].op == "LABEL"
+            and isinstance(instructions[i + 1].result, str)
+            and instructions[i + 1].result.startswith("for")
+        ):
+            init_instr = instructions[i]
+            label_instr = instructions[i + 1]
+            cond_instr = instructions[i + 2]
+            branch_instr = instructions[i + 3]
+
+            induction_var = init_instr.result
+            start_value = _as_int_constant(init_instr.arg1)
+            loop_label = label_instr.result
+
+            if start_value is None:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            if cond_instr.op not in {"<", "<=", ">", ">="}:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            if cond_instr.arg1 != induction_var:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            bound_value = _as_int_constant(cond_instr.arg2)
+
+            if bound_value is None:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            if (
+                branch_instr.op != "IF_FALSE"
+                or branch_instr.arg1 != cond_instr.result
+            ):
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            end_label = branch_instr.result
+            end_index = _find_label(instructions, end_label, i + 4)
+
+            if end_index is None:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            back_goto_index = _last_goto_to_label(
+                instructions,
+                loop_label,
+                i + 4,
+                end_index
+            )
+
+            if back_goto_index is None:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            update_index = back_goto_index - 1
+
+            if update_index <= i + 3:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            update_instr = instructions[update_index]
+
+            if (
+                update_instr.op not in {"+", "-"}
+                or update_instr.result != induction_var
+                or update_instr.arg1 != induction_var
+            ):
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            raw_step = _as_int_constant(update_instr.arg2)
+
+            if raw_step is None:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            step = raw_step if update_instr.op == "+" else -raw_step
+
+            iteration_count = _compute_iteration_count(
+                start_value,
+                bound_value,
+                cond_instr.op,
+                step
+            )
+
+            if iteration_count is None or iteration_count > max_unroll:
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            # El cuerpo empieza después del IF_FALSE.
+            body_start = i + 4
+
+            # El cuerpo termina antes del update.
+            body_end = update_index
+
+            # Si justo antes del update hay un label for_update, no forma parte del cuerpo.
+            if (
+                body_end - 1 >= body_start
+                and instructions[body_end - 1].op == "LABEL"
+                and isinstance(instructions[body_end - 1].result, str)
+                and instructions[body_end - 1].result.startswith("for_update")
+            ):
+                body_end -= 1
+
+            body = instructions[body_start:body_end]
+
+            if not _body_is_safe_to_unroll(body, induction_var):
+                optimized.append(instructions[i])
+                i += 1
+                continue
+
+            # Emitimos init original.
+            optimized.append(init_instr)
+
+            current_value = start_value
+
+            for _ in range(iteration_count):
+                temp_map = {}
+
+                for body_instr in body:
+                    cloned = _clone_instruction_for_unroll(
+                        body_instr,
+                        induction_var,
+                        current_value,
+                        temp_map,
+                        temp_counter
+                    )
+                    optimized.append(cloned)
+
+                current_value += step
+
+            # Preservamos valor final de la variable de inducción.
+            optimized.append(
+                TACInstruction("ASSIGN", arg1=current_value, result=induction_var)
+            )
+
+            # Saltamos todo el loop original hasta después del end label.
+            i = end_index + 1
+            continue
+
+        optimized.append(instructions[i])
+        i += 1
+
+    return optimized
+
 
 def optimize_once(instructions):
+    instructions = constant_and_copy_propagation(instructions)
+    instructions = loop_unrolling(instructions, max_unroll=8)
     instructions = constant_and_copy_propagation(instructions)
     instructions = remove_dead_code_after_jumps(instructions)
     instructions = remove_redundant_gotos(instructions)
