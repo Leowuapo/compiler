@@ -1,0 +1,46 @@
+func BasicLoopUnrolling:
+total = 0
+i = 0
+for1:
+t1 = i < 3
+ifFalse t1 goto endfor3
+t2 = total + i
+total = t2
+for_update2:
+i = i + 1
+goto for1
+endfor3:
+return total
+end func BasicLoopUnrolling
+func LargeLoopUnrolling:
+total = 0
+i = 0
+for4:
+t3 = i < 20
+ifFalse t3 goto endfor6
+t4 = total + i
+total = t4
+for_update5:
+i = i + 1
+goto for4
+endfor6:
+return total
+end func LargeLoopUnrolling
+func LoopWithContinue:
+total = 0
+i = 0
+for7:
+t5 = i < 3
+ifFalse t5 goto endfor9
+t6 = i == 1
+ifFalse t6 goto endif10
+goto for_update8
+endif10:
+t7 = total + i
+total = t7
+for_update8:
+i = i + 1
+goto for7
+endfor9:
+return total
+end func LoopWithContinue

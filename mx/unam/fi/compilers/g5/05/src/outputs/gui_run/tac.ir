@@ -1,0 +1,12 @@
+func main:
+t1 = 2 + 3
+t2 = t1 * 4
+y = t2
+values[0] = 10
+t3 = values[0]
+t4 = y > t3
+ifFalse t4 goto endif1
+printf 'result = %f', y
+endif1:
+return 0
+end func main
