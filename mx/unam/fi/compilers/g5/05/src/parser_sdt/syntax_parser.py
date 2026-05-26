@@ -1,5 +1,6 @@
 from .parsertable import tabla_action, tabla_goto, productions
 from .sdt import tabla_simbolos, tabla_funciones, accion_semantica, imprimir_arbol, exportar_arbol_graphviz, reset_semantica, entrar_ambito, salir_ambito
+from backend.tac import generar_tac, imprimir_tac, guardar_tac
 import traceback
 
 ultimo_ast = None
@@ -251,6 +252,12 @@ def analizar(tokens, ast_base_path="ast"):
 
                 ultimo_ast = pila_sem[-1]
                 exportar_arbol_graphviz(ultimo_ast, ast_base_path)
+
+                print("TAC:")
+                tac = generar_tac(ultimo_ast)
+                imprimir_tac(tac)
+                guardar_tac(tac, "tac.ir")
+
                 ultimo_resultado = {
                     "ok": True,
                     "fase": "semantic",
@@ -258,6 +265,7 @@ def analizar(tokens, ast_base_path="ast"):
                     "ast": ultimo_ast,
                     "symbol_table": tabla_simbolos.simbolos,
                     "function_table": tabla_funciones.funciones,
+                    "tac": tac,
                 }
 
                 return True
