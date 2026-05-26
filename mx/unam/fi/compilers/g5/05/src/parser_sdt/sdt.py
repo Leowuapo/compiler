@@ -105,11 +105,21 @@ class TablaSimbolos:
     def mostrar(self):
         for nombre, datos in self.simbolos.items():
             if datos.get('es_array', False):
-                valores = [formatear_valor(v) for v in datos['valor']]
-                print(
-                    f"{nombre} -> type: {datos['tipo']}[{datos['tamano']}], "
-                    f"value: {valores}"
-                )
+                if datos.get('dimensiones') == 2:
+                    valores = [
+                        [formatear_valor(v) for v in fila]
+                        for fila in datos['valor']
+                    ]
+                    print(
+                        f"{nombre} -> type: {datos['tipo']}[{datos['filas']}][{datos['columnas']}], "
+                        f"value: {valores}"
+                    )
+                else:
+                    valores = [formatear_valor(v) for v in datos['valor']]
+                    print(
+                        f"{nombre} -> type: {datos['tipo']}[{datos['tamano']}], "
+                        f"value: {valores}"
+                    )
             else:
                 print(
                     f"{nombre} -> type: {datos['tipo']}, "
@@ -138,6 +148,34 @@ class TablaSimbolos:
             'tamano': tamano
         }
 
+    def declarar_matriz(self, nombre, tipo, filas, columnas, posiciones=None, indice=0):
+        tipo = normalizar_tipo(tipo, posiciones, indice)
+
+        if tipo == "void":
+            error_semantico(f"matrix '{nombre}' cannot be declared as void", posiciones, indice)
+
+        if nombre in self.simbolos:
+            error_semantico(f"variable '{nombre}' already declared", posiciones, indice)
+
+        if not isinstance(filas, int) or not isinstance(columnas, int):
+            error_semantico(f"matrix dimensions for '{nombre}' must be integers", posiciones, indice)
+
+        if filas <= 0 or columnas <= 0:
+            error_semantico(
+                f"matrix dimensions for '{nombre}' must be greater than zero",
+                posiciones,
+                indice
+            )
+
+        self.simbolos[nombre] = {
+            'tipo': tipo,
+            'valor': [[None for _ in range(columnas)] for _ in range(filas)],
+            'es_array': True,
+            'dimensiones': 2,
+            'filas': filas,
+            'columnas': columnas
+        }
+
     def asignar_array(self, nombre, indice_array, valor, posiciones=None, indice=0, nodo=None):
         if nombre not in self.simbolos:
             error_semantico(f"array '{nombre}' not declared", posiciones, indice, nodo)
@@ -146,6 +184,9 @@ class TablaSimbolos:
 
         if not datos.get('es_array', False):
             error_semantico(f"variable '{nombre}' is not an array", posiciones, indice, nodo)
+
+        if datos.get('dimensiones', 1) != 1:
+            error_semantico(f"variable '{nombre}' is not a one-dimensional array", posiciones, indice, nodo)
 
         if es_valor_desconocido(indice_array):
             error_semantico(
@@ -174,6 +215,51 @@ class TablaSimbolos:
             indice,
             nodo
         )
+    
+    def asignar_matriz(self, nombre, fila, columna, valor, posiciones=None, indice=0, nodo=None):
+        if nombre not in self.simbolos:
+            error_semantico(f"matrix '{nombre}' not declared", posiciones, indice, nodo)
+
+        datos = self.simbolos[nombre]
+
+        if not datos.get('es_array', False) or datos.get('dimensiones') != 2:
+            error_semantico(f"variable '{nombre}' is not a matrix", posiciones, indice, nodo)
+
+        if es_valor_desconocido(fila) or es_valor_desconocido(columna):
+            error_semantico(
+                f"matrix indices for '{nombre}' must be known at semantic analysis",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        if not isinstance(fila, int) or not isinstance(columna, int):
+            error_semantico(f"matrix indices for '{nombre}' must be integers", posiciones, indice, nodo)
+
+        if fila < 0 or fila >= datos['filas']:
+            error_semantico(
+                f"matrix row index {fila} out of bounds for '{nombre}' with {datos['filas']} row(s)",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        if columna < 0 or columna >= datos['columnas']:
+            error_semantico(
+                f"matrix column index {columna} out of bounds for '{nombre}' with {datos['columnas']} column(s)",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        datos['valor'][fila][columna] = convertir_a_tipo(
+            valor,
+            datos['tipo'],
+            f"{nombre}[{fila}][{columna}]",
+            posiciones,
+            indice,
+            nodo
+        )
 
     def obtener_array(self, nombre, indice_array, posiciones=None, indice=0, nodo=None):
         if nombre not in self.simbolos:
@@ -183,6 +269,9 @@ class TablaSimbolos:
 
         if not datos.get('es_array', False):
             error_semantico(f"variable '{nombre}' is not an array", posiciones, indice, nodo)
+
+        if datos.get('dimensiones', 1) != 1:
+            error_semantico(f"variable '{nombre}' is not a one-dimensional array", posiciones, indice, nodo)
 
         if es_valor_desconocido(indice_array):
             return ValorDesconocido(datos['tipo'], f"{nombre}[unknown]"), datos['tipo']
@@ -203,6 +292,49 @@ class TablaSimbolos:
         if valor is None:
             error_semantico(
                 f"array element '{nombre}[{indice_array}]' used before initialization",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        return valor, datos['tipo']
+    
+    def obtener_matriz(self, nombre, fila, columna, posiciones=None, indice=0, nodo=None):
+        if nombre not in self.simbolos:
+            error_semantico(f"matrix '{nombre}' not declared", posiciones, indice, nodo)
+
+        datos = self.simbolos[nombre]
+
+        if not datos.get('es_array', False) or datos.get('dimensiones') != 2:
+            error_semantico(f"variable '{nombre}' is not a matrix", posiciones, indice, nodo)
+
+        if es_valor_desconocido(fila) or es_valor_desconocido(columna):
+            return ValorDesconocido(datos['tipo'], f"{nombre}[unknown][unknown]"), datos['tipo']
+
+        if not isinstance(fila, int) or not isinstance(columna, int):
+            error_semantico(f"matrix indices for '{nombre}' must be integers", posiciones, indice, nodo)
+
+        if fila < 0 or fila >= datos['filas']:
+            error_semantico(
+                f"matrix row index {fila} out of bounds for '{nombre}' with {datos['filas']} row(s)",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        if columna < 0 or columna >= datos['columnas']:
+            error_semantico(
+                f"matrix column index {columna} out of bounds for '{nombre}' with {datos['columnas']} column(s)",
+                posiciones,
+                indice,
+                nodo
+            )
+
+        valor = datos['valor'][fila][columna]
+
+        if valor is None:
+            error_semantico(
+                f"matrix element '{nombre}[{fila}][{columna}]' used before initialization",
                 posiciones,
                 indice,
                 nodo
@@ -496,6 +628,9 @@ def evaluar_con_tipo(nodo):
     
     if nodo.tipo == 'ARRAY_ACCESS':
         return _evaluar_array_access(nodo)
+    
+    if nodo.tipo == 'MATRIX_ACCESS':
+        return _evaluar_matrix_access(nodo)
 
     if nodo.tipo == 'CALL':
         info_funcion = tabla_funciones.obtener(nodo.valor)
@@ -663,6 +798,9 @@ def evaluar_con_tipo(nodo):
 
 
 def _declarar_item(tipo_dato, item):
+    if item.tipo == 'DECL_MATRIX_ITEM':
+        return _declarar_matriz_item(tipo_dato, item)
+    
     if item.tipo == 'DECL_ARRAY_ITEM':
         return _declarar_array_item(tipo_dato, item)
     
@@ -1210,6 +1348,53 @@ def _declarar_array_item(tipo_dato, item):
     )
 
 
+def _declarar_matriz_item(tipo_dato, item):
+    nombre_var = item.valor
+    filas_nodo = item.hijos[0]
+    columnas_nodo = item.hijos[1]
+
+    filas_valor, filas_tipo = evaluarexpresion(filas_nodo, con_tipo=True)
+    columnas_valor, columnas_tipo = evaluarexpresion(columnas_nodo, con_tipo=True)
+
+    if filas_tipo not in ENTEROS | {"char", "bool"}:
+        error_semantico(
+            f"matrix row size for '{nombre_var}' must be integer-compatible",
+            nodo=filas_nodo
+        )
+
+    if columnas_tipo not in ENTEROS | {"char", "bool"}:
+        error_semantico(
+            f"matrix column size for '{nombre_var}' must be integer-compatible",
+            nodo=columnas_nodo
+        )
+
+    if es_valor_desconocido(filas_valor) or es_valor_desconocido(columnas_valor):
+        error_semantico(
+            f"matrix dimensions for '{nombre_var}' must be known at compile time",
+            nodo=item
+        )
+
+    filas = valor_numerico(filas_valor)
+    columnas = valor_numerico(columnas_valor)
+
+    tabla_actual = obtener_tabla_actual()
+    pos_item = [(item.linea, item.columna)] if item.linea is not None else None
+
+    tabla_actual.declarar_matriz(nombre_var, tipo_dato, filas, columnas, pos_item, 0)
+
+    return Nodo(
+        'DECL_MATRIX',
+        nombre_var,
+        [
+            Nodo('TYPE', tipo_dato, linea=item.linea, columna=item.columna),
+            filas_nodo,
+            columnas_nodo
+        ],
+        linea=item.linea,
+        columna=item.columna
+    )
+
+
 def _crear_array_access(nombre_var, indice_nodo, posiciones=None):
     linea, columna = _pos(posiciones, 0)
 
@@ -1217,6 +1402,18 @@ def _crear_array_access(nombre_var, indice_nodo, posiciones=None):
         'ARRAY_ACCESS',
         nombre_var,
         [indice_nodo],
+        linea=linea,
+        columna=columna
+    )
+
+
+def _crear_matrix_access(nombre_var, fila_nodo, columna_nodo, posiciones=None):
+    linea, columna = _pos(posiciones, 0)
+
+    return Nodo(
+        'MATRIX_ACCESS',
+        nombre_var,
+        [fila_nodo, columna_nodo],
         linea=linea,
         columna=columna
     )
@@ -1234,6 +1431,22 @@ def _evaluar_array_access(nodo):
         error_semantico(f"array '{nombre_var}' not declared", nodo=nodo)
 
     return ambito.obtener_array(nombre_var, indice_valor, nodo=nodo)
+
+
+def _evaluar_matrix_access(nodo):
+    nombre_var = nodo.valor
+    fila_nodo = nodo.hijos[0]
+    columna_nodo = nodo.hijos[1]
+
+    fila_valor = _evaluar_indice_array(fila_nodo)
+    columna_valor = _evaluar_indice_array(columna_nodo)
+
+    ambito, _ = buscar_variable(nombre_var)
+
+    if ambito is None:
+        error_semantico(f"matrix '{nombre_var}' not declared", nodo=nodo)
+
+    return ambito.obtener_matriz(nombre_var, fila_valor, columna_valor, nodo=nodo)
 
 
 def _asignar_array_access(array_nodo, expr_nodo, posiciones=None):
@@ -1262,6 +1475,40 @@ def _asignar_array_access(array_nodo, expr_nodo, posiciones=None):
         'ASSIGN_ARRAY',
         nombre_var,
         [indice_nodo, expr_nodo],
+        linea=linea,
+        columna=columna
+    )
+
+
+def _asignar_matrix_access(matrix_nodo, expr_nodo, posiciones=None):
+    nombre_var = matrix_nodo.valor
+    fila_nodo = matrix_nodo.hijos[0]
+    columna_nodo = matrix_nodo.hijos[1]
+
+    fila_valor = _evaluar_indice_array(fila_nodo)
+    columna_valor = _evaluar_indice_array(columna_nodo)
+    valor = evaluarexpresion(expr_nodo)
+
+    ambito, _ = buscar_variable(nombre_var)
+
+    if ambito is None:
+        error_semantico(f"matrix '{nombre_var}' not declared", nodo=matrix_nodo)
+
+    ambito.asignar_matriz(
+        nombre_var,
+        fila_valor,
+        columna_valor,
+        valor,
+        posiciones,
+        0,
+        nodo=matrix_nodo
+    )
+
+    linea, columna = _pos(posiciones, 0)
+    return Nodo(
+        'ASSIGN_MATRIX',
+        nombre_var,
+        [fila_nodo, columna_nodo, expr_nodo],
         linea=linea,
         columna=columna
     )
@@ -1353,6 +1600,17 @@ def accion_semantica(produccion, elementos, posiciones=None):
             columna=columna
         )
     
+    elif lhs == "DeclItem" and rhs == ("ID", "[", "E", "]", "[", "E", "]"):
+        linea, columna = _pos(posiciones, 0)
+
+        return Nodo(
+            'DECL_MATRIX_ITEM',
+            elementos[0],
+            [elementos[2], elementos[5]],
+            linea=linea,
+            columna=columna
+        )
+    
     elif lhs == "DeclItem" and rhs == ("ID", "[", "E", "]", "=", "{", "InitList", "}"):
         linea, columna = _pos(posiciones, 0)
 
@@ -1383,6 +1641,13 @@ def accion_semantica(produccion, elementos, posiciones=None):
     
     elif lhs == "Assignment" and rhs == ("ArrayAccess", "=", "E"):
         return _asignar_array_access(
+            elementos[0],
+            elementos[2],
+            posiciones
+        )
+    
+    elif lhs == "Assignment" and rhs == ("MatrixAccess", "=", "E"):
+        return _asignar_matrix_access(
             elementos[0],
             elementos[2],
             posiciones
@@ -1719,6 +1984,9 @@ def accion_semantica(produccion, elementos, posiciones=None):
     elif lhs == "Primary" and rhs == ("ArrayAccess",):
         return elementos[0]
     
+    elif lhs == "Primary" and rhs == ("MatrixAccess",):
+        return elementos[0]
+    
     # Funciones
     elif lhs == "FunctionHeader" and rhs == ("TYPE", "ID", "(", ")"):
         tipo_retorno = normalizar_tipo(elementos[0], posiciones, 0)
@@ -2024,6 +2292,16 @@ def accion_semantica(produccion, elementos, posiciones=None):
 
     elif lhs == "InitList" and rhs == ("InitList", ",", "E"):
         return elementos[0] + [elementos[2]]
+
+    # Matrices
+    elif lhs == "MatrixAccess" and rhs == ("ID", "[", "E", "]", "[", "E", "]"):
+        return _crear_matrix_access(
+            elementos[0],
+            elementos[2],
+            elementos[5],
+            posiciones
+        )
+    
 
     error_semantico(
         f"semantic action not implemented for production: {lhs} -> {' '.join(rhs)}",
