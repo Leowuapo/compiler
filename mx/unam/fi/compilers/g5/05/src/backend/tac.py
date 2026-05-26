@@ -126,6 +126,14 @@ class TACGenerator:
                 self.visit(item)
             return None
 
+        # Los tipos "++" y "--" no pueden mapearse directamente
+        # a nombres de método Python como visit_++ o visit_--.
+        if nodo.tipo == "++":
+            return self.visit_INC(nodo)
+
+        if nodo.tipo == "--":
+            return self.visit_DEC(nodo)
+
         metodo = getattr(self, f"visit_{nodo.tipo}", self.visit_default)
         return metodo(nodo)
 
@@ -207,6 +215,15 @@ class TACGenerator:
     def visit_ASSIGN(self, nodo):
         valor = self.gen_expr(nodo.hijos[0])
         self.emit("ASSIGN", arg1=valor, result=nodo.valor)
+
+    def visit_INC(self, nodo):
+        nombre = nodo.valor
+        self.emit("+", arg1=nombre, arg2=1, result=nombre)
+
+
+    def visit_DEC(self, nodo):
+        nombre = nodo.valor
+        self.emit("-", arg1=nombre, arg2=1, result=nombre)
 
     def visit_ASSIGN_ARRAY(self, nodo):
         nombre = nodo.valor

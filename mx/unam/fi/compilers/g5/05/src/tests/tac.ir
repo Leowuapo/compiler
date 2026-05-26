@@ -1,148 +1,57 @@
-<<<<<<< HEAD
-func suma:
-param a
-param b
-t1 = a + b
-return t1
-end func suma
-func abs_val:
-param x
-t2 = x < 0
-ifFalse t2 goto else1
-t3 = -x
-return t3
-goto endif2
-else1:
-return x
-endif2:
-end func abs_val
-func es_mayor:
-param a
-param b
-t4 = a > b
-return t4
-end func es_mayor
-func procesar_array:
-param base
-arr[0] = 1
-arr[1] = 2
-arr[2] = 3
-arr[3] = 4
+func prueba_constantes:
+t1 = 3 * 4
+t2 = 2 + t1
+x = t2
+t3 = x + 0
+y = t3
+t4 = y * 1
+z = t4
+ifFalse true goto endif1
+print z
+endif1:
+return z
+end func prueba_constantes
+func prueba_branch:
+ifFalse false goto else2
+print 1
+goto endif3
+else2:
+print 2
+endif3:
+return 0
+end func prueba_branch
+func prueba_temporales:
+x = 10
+y = x
+z = y
+return z
+end func prueba_temporales
+func prueba_for:
 total = 0
 i = 0
-for3:
-t5 = i < 4
-ifFalse t5 goto endfor5
-t6 = arr[i]
-t7 = t6 + base
-arr[i] = t7
-t8 = arr[i]
-t9 = total + t8
-total = t9
-t10 = total > 20
-ifFalse t10 goto endif6
-goto endfor5
-endif6:
-for_update4:
-goto for3
-endfor5:
+for4:
+t5 = i < 3
+ifFalse t5 goto endfor6
+t6 = total + i
+total = t6
+for_update5:
+i = i + 1
+goto for4
+endfor6:
 return total
-end func procesar_array
-func procesar_matriz:
-m[0][0] = 1
-m[0][1] = 2
-m[1][0] = 3
-m[1][1] = 4
-t11 = m[0][0]
-t12 = m[1][1]
-t13 = t11 + t12
+end func prueba_for
+func main:
+t7 = call prueba_constantes, 0
+a = t7
+t8 = call prueba_branch, 0
+b = t8
+t9 = call prueba_temporales, 0
+c = t9
+t10 = call prueba_for, 0
+d = t10
+printf 'a=%d b=%d c=%d d=%d', a, b, c, d
+t11 = a + b
+t12 = t11 + c
+t13 = t12 + d
 return t13
-end func procesar_matriz
-func imprimir_valores:
-param x
-param y
-param flag
-printf 'x=%d y=%d flag=%b', x, y, flag
-t14 = x + y
-print t14
-end func imprimir_valores
-func main:
-a = 10
-t15 = -3
-b = t15
-arg a
-arg b
-t16 = call abs_val, 1
-arg t16
-t17 = call suma, 2
-c = t17
-arg c
-t18 = call procesar_array, 1
-d = t18
-t19 = call procesar_matriz, 0
-e = t19
-arg d
-arg e
-t20 = call es_mayor, 2
-t21 = c == 0
-t22 = !t21
-t23 = t20 && t22
-flag = t23
-arg d
-arg e
-arg flag
-call imprimir_valores, 3
-while7:
-t24 = a > 0
-ifFalse t24 goto endwhile8
-t25 = a - 1
-a = t25
-t26 = a % 2
-t27 = t26 == 0
-ifFalse t27 goto endif9
-goto while7
-endif9:
-t28 = a < 3
-ifFalse t28 goto endif10
-goto endwhile8
-endif10:
-print a
-goto while7
-endwhile8:
-t29 = c == 1
-if t29 goto case13
-t30 = c == 13
-if t30 goto case14
-goto default12
-case13:
-printf 'case uno'
-goto endswitch11
-case14:
-printf 'case trece'
-goto endswitch11
-default12:
-printf 'case default'
-goto endswitch11
-endswitch11:
-i = 0
-for15:
-t31 = i < 3
-ifFalse t31 goto endfor17
-t32 = i * 2
-t33 = +t32
-t34 = -1
-t35 = t33 + t34
-temp = t35
-printf 'temp=%d', temp
-for_update16:
-goto for15
-endfor17:
-t36 = d + e
-return t36
-=======
-func main:
-return 1
-x = 10
-print x
->>>>>>> feature/codegen-pipeline
 end func main
