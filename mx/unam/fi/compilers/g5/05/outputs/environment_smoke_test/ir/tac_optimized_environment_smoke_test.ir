@@ -1,0 +1,5 @@
+func main:
+x = 5
+print 5
+return 5
+end func main

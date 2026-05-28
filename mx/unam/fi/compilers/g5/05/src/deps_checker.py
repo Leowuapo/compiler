@@ -1,133 +1,241 @@
 #!/usr/bin/env python3
 """
-Verificador de dependencias para Parser & SDT - Team 05
+Cross-platform dependency checker for PENTA Compiler.
+
+This module is intentionally lightweight and safe to import from GUI.py.
+It checks Python/Tkinter/CustomTkinter/Pillow/Graphviz and returns
+platform-aware installation recommendations.
 """
 
+from __future__ import annotations
+
+import platform
+import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
+from typing import Callable
+
+MIN_PYTHON = (3, 10)
 
 
-def check_tkinter():
-    """Verifica que Tkinter esta instalado"""
+@dataclass(frozen=True)
+class DependencyResult:
+    ok: bool
+    info: str
+    required: bool = False
+
+
+def _platform_key() -> str:
+    system = platform.system().lower()
+    if system.startswith("darwin"):
+        return "macos"
+    if system.startswith("windows"):
+        return "windows"
+    if system.startswith("linux"):
+        return "linux"
+    return "unknown"
+
+
+def _recommendations() -> dict[str, str]:
+    system = _platform_key()
+
+    common_pip = (
+        "python -m pip install --upgrade pip\n"
+        "python -m pip install -r requirements.txt"
+    )
+
+    if system == "windows":
+        return {
+            "python": (
+                "Install Python 3.10+ from python.org or Microsoft Store. "
+                "During installation, enable 'Add python.exe to PATH'."
+            ),
+            "tkinter": "Tkinter is normally included with python.org installers on Windows. Reinstall Python if it is missing.",
+            "customtkinter": common_pip,
+            "pillow": common_pip,
+            "graphviz": (
+                "Install Graphviz from https://graphviz.org/download/ and add its bin folder to PATH.\n"
+                "Typical PATH entry: C:\\Program Files\\Graphviz\\bin\n"
+                "Then open a new terminal and verify: dot -V"
+            ),
+        }
+
+    if system == "linux":
+        return {
+            "python": "Install Python 3.10+ with your package manager, e.g. sudo apt install python3 python3-venv python3-pip",
+            "tkinter": "Ubuntu/Debian: sudo apt install python3-tk    Fedora: sudo dnf install python3-tkinter",
+            "customtkinter": common_pip,
+            "pillow": common_pip,
+            "graphviz": "Ubuntu/Debian: sudo apt install graphviz    Fedora: sudo dnf install graphviz",
+        }
+
+    if system == "macos":
+        return {
+            "python": "Install Python 3.10+ from python.org or Homebrew: brew install python",
+            "tkinter": "If using Homebrew Python: brew install python-tk. Python.org builds usually include Tkinter.",
+            "customtkinter": common_pip,
+            "pillow": common_pip,
+            "graphviz": "brew install graphviz    Then verify: dot -V",
+        }
+
+    return {
+        "python": "Install Python 3.10+.",
+        "tkinter": "Install Tkinter for your Python distribution.",
+        "customtkinter": common_pip,
+        "pillow": common_pip,
+        "graphviz": "Install Graphviz and make sure the 'dot' command is available in PATH.",
+    }
+
+
+def check_python() -> tuple[bool, str]:
+    current = sys.version_info[:3]
+    ok = current >= MIN_PYTHON
+    info = f"Python {current[0]}.{current[1]}.{current[2]}"
+    if not ok:
+        info += f" (requires {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+)"
+    return ok, info
+
+
+def check_tkinter() -> tuple[bool, str]:
     try:
-        import tkinter as tk
+        import tkinter as tk  # noqa: F401
         return True, f"Tkinter {tk.TkVersion}"
-    except ImportError:
-        return False, "Tkinter no instalado"
+    except Exception as exc:
+        return False, f"Tkinter not available: {exc}"
 
 
-def check_pillow():
-    """Verifica que Pillow (PIL) esta instalado"""
+def check_customtkinter() -> tuple[bool, str]:
     try:
-        from PIL import Image, ImageTk
+        import customtkinter as ctk  # noqa: F401
+        version = getattr(ctk, "__version__", "installed")
+        return True, f"CustomTkinter {version}"
+    except Exception as exc:
+        return False, f"CustomTkinter not available: {exc}"
+
+
+def check_pillow() -> tuple[bool, str]:
+    try:
+        from PIL import Image  # noqa: F401
         return True, f"Pillow {Image.__version__}"
-    except ImportError:
-        return False, "Pillow no instalado"
+    except Exception as exc:
+        return False, f"Pillow not available: {exc}"
 
 
-def check_graphviz():
-    """Verifica que Graphviz (dot) esta instalado en el sistema"""
+def check_graphviz() -> tuple[bool, str]:
+    dot_path = shutil.which("dot")
+    if not dot_path:
+        return False, "Graphviz not available: command 'dot' was not found in PATH"
+
     try:
-        result = subprocess.run(['dot', '-V'], capture_output=True, text=True)
-        if result.returncode == 0:
-            version_output = result.stderr or result.stdout
-            # Extraer version (ej: 'dot - graphviz version 2.49.3')
-            version = version_output.split('version')[1].strip() if 'version' in version_output else 'desconocida'
-            return True, f"Graphviz {version}"
-        return False, "Graphviz no instalado"
-    except FileNotFoundError:
-        return False, "Graphviz no instalado (comando 'dot' no encontrado)"
+        result = subprocess.run(
+            [dot_path, "-V"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+    except Exception as exc:
+        return False, f"Graphviz found at {dot_path}, but could not run 'dot -V': {exc}"
+
+    version_output = (result.stderr or result.stdout or "").strip()
+    if result.returncode == 0:
+        return True, f"{version_output or 'Graphviz available'} ({dot_path})"
+
+    return False, f"Graphviz command failed: {version_output or 'unknown error'} ({dot_path})"
 
 
 def check_all():
     """
-    Verifica todas las dependencias
-    Retorna: (obligatorias_ok, dict_resultados, dict_recomendaciones)
+    Returns: (required_ok, results, recommendations)
+
+    results keeps the historical shape expected by GUI.py:
+        {name: (ok, info)}
     """
-    resultados = {
-        'tkinter': check_tkinter(),
-        'pillow': check_pillow(),
-        'graphviz': check_graphviz()
+    checks: dict[str, tuple[Callable[[], tuple[bool, str]], bool]] = {
+        "python": (check_python, True),
+        "tkinter": (check_tkinter, True),
+        "customtkinter": (check_customtkinter, True),
+        "pillow": (check_pillow, False),
+        "graphviz": (check_graphviz, False),
     }
-    
-    # Dependencias obligatorias
-    obligatorias = ['tkinter']
-    obligatorias_ok = all(resultados[dep][0] for dep in obligatorias)
-    
-    # Recomendaciones de instalacion
-    recomendaciones = {}
-    
-    if not resultados['pillow'][0]:
-        recomendaciones['pillow'] = "  brew install pillow  o  pip install Pillow"
-    
-    if not resultados['graphviz'][0]:
-        recomendaciones['graphviz'] = "  brew install graphviz"
-    
-    return obligatorias_ok, resultados, recomendaciones
+
+    raw_results: dict[str, DependencyResult] = {}
+    for name, (func, required) in checks.items():
+        ok, info = func()
+        raw_results[name] = DependencyResult(ok=ok, info=info, required=required)
+
+    required_ok = all(result.ok for result in raw_results.values() if result.required)
+    results = {name: (result.ok, result.info) for name, result in raw_results.items()}
+
+    all_recs = _recommendations()
+    recommendations = {
+        name: all_recs.get(name, "Install or repair this dependency.")
+        for name, result in raw_results.items()
+        if not result.ok
+    }
+
+    return required_ok, results, recommendations
 
 
-def print_status(resultados):
-    """Imprime el estado de las dependencias en consola"""
-    print("\n" + "="*50)
-    print("DEPENDENCIAS - Parser & SDT")
-    print("="*50)
-    
+def print_status(resultados=None):
+    if resultados is None:
+        _, resultados, _ = check_all()
+
+    print("\n" + "=" * 64)
+    print("PENTA COMPILER - ENVIRONMENT CHECK")
+    print("=" * 64)
+    print(f"Platform : {platform.platform()}")
+    print(f"Executable: {sys.executable}")
+    print("-" * 64)
+
     for dep, (ok, info) in resultados.items():
         status = "[OK]" if ok else "[NO]"
-        print(f"{status} {dep.capitalize()}: {info}")
-    
-    print("="*50 + "\n")
+        print(f"{status} {dep:<14} {info}")
+
+    print("=" * 64 + "\n")
 
 
 def show_gui_warning(missing_deps, recommendations):
-    """
-    Muestra una ventana de advertencia si faltan dependencias
-    (para ser llamada desde la GUI)
-    """
-    import tkinter as tk
+    """Shows a GUI warning for missing optional dependencies."""
     from tkinter import messagebox
-    
+
     if not missing_deps:
         return True
-    
-    mensaje = "DEPENDENCIAS OPCIONALES FALTANTES\n\n"
-    mensaje += "El programa funcionara, pero con limitaciones:\n\n"
-    
+
+    mensaje = "DEPENDENCIAS FALTANTES O INCOMPLETAS\n\n"
+    mensaje += "El programa puede funcionar con limitaciones dependiendo de lo que falte:\n\n"
+
+    descriptions = {
+        "python": "Python 3.10+ es requerido por el proyecto.",
+        "tkinter": "Tkinter es requerido para abrir la GUI.",
+        "customtkinter": "CustomTkinter es requerido para abrir la GUI moderna.",
+        "pillow": "Pillow es opcional para cargar imágenes/logo.",
+        "graphviz": "Graphviz/dot es necesario para generar AST como SVG/PNG.",
+    }
+
     for dep in missing_deps:
-        if dep == 'pillow':
-            mensaje += "- Pillow: No se podran mostrar imagenes del AST\n"
-        elif dep == 'graphviz':
-            mensaje += "- Graphviz: El AST no se generara como imagen (solo como .dot)\n"
-    
-    mensaje += "\nPara instalar las dependencias faltantes:\n\n"
-    
-    for dep, cmd in recommendations.items():
-        mensaje += f"{dep.capitalize()}:\n{cmd}\n\n"
-    
-    respuesta = messagebox.askokcancel(
-        "Dependencias opcionales faltantes",
-        mensaje,
-        icon='warning'
-    )
-    
+        mensaje += f"- {dep}: {descriptions.get(dep, 'Dependencia requerida por el proyecto.')}\n"
+
+    mensaje += "\nCómo instalar o corregir:\n\n"
+    for dep in missing_deps:
+        if dep in recommendations:
+            mensaje += f"{dep}:\n{recommendations[dep]}\n\n"
+
+    messagebox.showwarning("Dependencias del entorno", mensaje)
     return True
 
 
 if __name__ == "__main__":
-    # Prueba independiente
-    obligatorias_ok, resultados, recomendaciones = check_all()
-    print_status(resultados)
-    
-    if not obligatorias_ok:
-        print("ERROR: Faltan dependencias obligatorias.")
-        print("Instale Tkinter con: brew install python-tk")
+    required_ok, results, recommendations = check_all()
+    print_status(results)
+
+    missing = [name for name, (ok, _) in results.items() if not ok]
+    if missing:
+        print("Missing or incomplete dependencies:\n")
+        for dep in missing:
+            print(f"- {dep}:\n{recommendations.get(dep, 'No recommendation available.')}\n")
+
+    if not required_ok:
         sys.exit(1)
-    else:
-        print("Todas las dependencias obligatorias estan instaladas.")
-        
-        if not resultados['pillow'][0] or not resultados['graphviz'][0]:
-            print("\nFaltan dependencias opcionales:")
-            for dep, cmd in recomendaciones.items():
-                print(f"  - {dep}: {cmd}")
-        else:
-            print("\nTodas las dependencias (incluyendo opcionales) estan instaladas.")
+
+    print("Required dependencies look OK.")
