@@ -1352,6 +1352,7 @@ def _declarar_matriz_item(tipo_dato, item):
     nombre_var = item.valor
     filas_nodo = item.hijos[0]
     columnas_nodo = item.hijos[1]
+    init_nodo = item.hijos[2] if len(item.hijos) > 2 else None
 
     filas_valor, filas_tipo = evaluarexpresion(filas_nodo, con_tipo=True)
     columnas_valor, columnas_tipo = evaluarexpresion(columnas_nodo, con_tipo=True)
@@ -1382,14 +1383,49 @@ def _declarar_matriz_item(tipo_dato, item):
 
     tabla_actual.declarar_matriz(nombre_var, tipo_dato, filas, columnas, pos_item, 0)
 
+    hijos_ast = [
+        Nodo('TYPE', tipo_dato, linea=item.linea, columna=item.columna),
+        filas_nodo,
+        columnas_nodo
+    ]
+
+    if init_nodo is not None:
+        filas_init = init_nodo.hijos
+
+        if len(filas_init) != filas:
+            error_semantico(
+                f"matrix '{nombre_var}' expects {filas} row initializer(s), got {len(filas_init)}",
+                nodo=init_nodo
+            )
+
+        for indice_fila, fila_nodo in enumerate(filas_init):
+            inicializadores = fila_nodo.hijos
+
+            if len(inicializadores) != columnas:
+                error_semantico(
+                    f"matrix '{nombre_var}' row {indice_fila} expects {columnas} initializer(s), got {len(inicializadores)}",
+                    nodo=fila_nodo
+                )
+
+            for indice_columna, expr_nodo in enumerate(inicializadores):
+                valor = evaluarexpresion(expr_nodo)
+
+                tabla_actual.asignar_matriz(
+                    nombre_var,
+                    indice_fila,
+                    indice_columna,
+                    valor,
+                    pos_item,
+                    0,
+                    nodo=expr_nodo
+                )
+
+        hijos_ast.append(init_nodo)
+
     return Nodo(
         'DECL_MATRIX',
         nombre_var,
-        [
-            Nodo('TYPE', tipo_dato, linea=item.linea, columna=item.columna),
-            filas_nodo,
-            columnas_nodo
-        ],
+        hijos_ast,
         linea=item.linea,
         columna=item.columna
     )
@@ -1607,6 +1643,25 @@ def accion_semantica(produccion, elementos, posiciones=None):
             'DECL_MATRIX_ITEM',
             elementos[0],
             [elementos[2], elementos[5]],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "DeclItem" and rhs == ("ID", "[", "E", "]", "[", "E", "]", "=", "{", "MatrixInitList", "}"):
+        linea, columna = _pos(posiciones, 0)
+
+        init_matrix = Nodo(
+            'INIT_MATRIX',
+            None,
+            elementos[9],
+            linea=linea,
+            columna=columna
+        )
+
+        return Nodo(
+            'DECL_MATRIX_ITEM',
+            elementos[0],
+            [elementos[2], elementos[5], init_matrix],
             linea=linea,
             columna=columna
         )
@@ -2291,6 +2346,23 @@ def accion_semantica(produccion, elementos, posiciones=None):
         return [elementos[0]]
 
     elif lhs == "InitList" and rhs == ("InitList", ",", "E"):
+        return elementos[0] + [elementos[2]]
+
+    # Inicialización de matrices
+    elif lhs == "MatrixRow" and rhs == ("{", "InitList", "}"):
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'INIT_LIST',
+            None,
+            elementos[1],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "MatrixInitList" and rhs == ("MatrixRow",):
+        return [elementos[0]]
+
+    elif lhs == "MatrixInitList" and rhs == ("MatrixInitList", ",", "MatrixRow"):
         return elementos[0] + [elementos[2]]
 
     # Matrices

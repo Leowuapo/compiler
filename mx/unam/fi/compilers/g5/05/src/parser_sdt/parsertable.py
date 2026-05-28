@@ -28,6 +28,7 @@ productions = [
     ("DeclItem", ["ID", "[", "E", "]"]),
     ("DeclItem", ["ID", "[", "E", "]", "=", "{", "InitList", "}"]),
     ("DeclItem", ["ID", "[", "E", "]", "[", "E", "]"]),
+    ("DeclItem", ["ID", "[", "E", "]", "[", "E", "]", "=", "{", "MatrixInitList", "}"]),
     
     # Asignación (variable ya declarada)
     ("Assignment", ["ID", "=", "E"]),
@@ -175,6 +176,11 @@ productions = [
     # Inicialización de arreglos
     ("InitList", ["E"]),
     ("InitList", ["InitList", ",", "E"]),
+
+    # Inicialización de matrices
+    ("MatrixInitList", ["MatrixRow"]),
+    ("MatrixInitList", ["MatrixInitList", ",", "MatrixRow"]),
+    ("MatrixRow", ["{", "InitList", "}"]),
 ]
 
 prod_num = {}
@@ -199,7 +205,7 @@ no_terminales = {
     "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
-    "ArrayAccess", "MatrixAccess", "InitList",
+    "ArrayAccess", "MatrixAccess", "InitList", "MatrixInitList", "MatrixRow",
     "IfStatement", "WhileStatement", 
     "ForStatement", "ForInit", "ForUpdate",
     "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",

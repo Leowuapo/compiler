@@ -208,8 +208,18 @@ class TACGenerator:
                 self.emit("STORE_ARRAY", arg1=valor, result=(nombre, indice))
 
     def visit_DECL_MATRIX(self, nodo):
+        nombre = nodo.valor
+
         # En TAC puro no emitimos declaración de matriz.
-        # Las asignaciones/accesos posteriores generarán STORE_MATRIX / LOAD_MATRIX.
+        # Si existe inicializador, lo bajamos a STORE_MATRIX por celda.
+        if len(nodo.hijos) > 3 and nodo.hijos[3].tipo == "INIT_MATRIX":
+            init_matrix = nodo.hijos[3]
+
+            for fila, fila_nodo in enumerate(init_matrix.hijos):
+                for columna, expr in enumerate(fila_nodo.hijos):
+                    valor = self.gen_expr(expr)
+                    self.emit("STORE_MATRIX", arg1=valor, result=(nombre, fila, columna))
+
         return None
 
     def visit_ASSIGN(self, nodo):
