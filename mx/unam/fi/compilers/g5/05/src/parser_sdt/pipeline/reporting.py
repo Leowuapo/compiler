@@ -1,6 +1,11 @@
+# PENTA Compiler - documentación interna
+# Salida compacta para consola: resume fases completadas, rutas de artefactos y salida de la máquina virtual.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 """Console reporting helpers for compact compiler runs."""
 
 
+# Imprime una vista compacta del resultado completo de compilación.
 def imprimir_resumen_ejecucion(resultado):
     """Imprime una salida compacta para ejecuciones normales."""
     source_path = resultado.get("source_path") or "<unknown>"

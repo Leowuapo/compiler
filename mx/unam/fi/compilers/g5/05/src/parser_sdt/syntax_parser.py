@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Parser LALR con acciones semánticas: consume tokens, valida la sintaxis y coordina AST, TAC, optimización, target code y VM.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from .parsertable import tabla_action, tabla_goto, productions
 from .sdt import tabla_simbolos, tabla_funciones, accion_semantica, imprimir_arbol, exportar_arbol_graphviz, reset_semantica, entrar_ambito, salir_ambito
 from backend.tac import generar_tac, imprimir_tac, guardar_tac
@@ -22,6 +26,7 @@ ultimo_ast = None
 ultimo_resultado = None
 
 
+# Ejecuta el ciclo shift/reduce y dispara acciones semánticas al reducir producciones.
 def analizar(tokens, ast_base_path="ast", output_dir=None, verbose=True, source_path=None):
     global ultimo_ast, ultimo_resultado
     ultimo_ast = None
@@ -39,9 +44,6 @@ def analizar(tokens, ast_base_path="ast", output_dir=None, verbose=True, source_
 
     try:
         entrada, lexemas, posiciones = mapear_tokens(tokens)
-        #print(f"[DEBUG] Entrada (tokens): {entrada}")
-        #print(f"[DEBUG] Lexemas: {lexemas}")
-        #print(f"[DEBUG] Longitud de entrada: {len(entrada)}")
     except Exception as e:
         print(f"Token mapping error: {e}")
         traceback.print_exc()
@@ -61,12 +63,9 @@ def analizar(tokens, ast_base_path="ast", output_dir=None, verbose=True, source_
         estado = pila[-1]
         token = entrada[pos]
 
-        #print(f"[DEBUG] Estado actual: {estado}, Token actual: '{token}', Posición: {pos}")
-        #print(f"[DEBUG] Tabla ACTION para estado {estado}: {tabla_action.get(estado, {})}")
 
         accion = tabla_action.get(estado, {}).get(token)
 
-        #print(f"[DEBUG] Acción encontrada: {accion}")
 
         if accion is None:
             linea, columna = posiciones[pos]
@@ -240,6 +239,7 @@ def analizar(tokens, ast_base_path="ast", output_dir=None, verbose=True, source_
 
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def obtener_ultimo_resultado():
     """Devuelve el resultado detallado de la última ejecución del parser.
 

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# PENTA Compiler - documentación interna
+# Validador de entorno: combina revisión de dependencias con una compilación pequeña de prueba.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 """Cross-platform environment and smoke-test checker for PENTA Compiler.
 
 Run from the repository root:
@@ -24,6 +28,7 @@ if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
 
+# Ejecuta la revisión de dependencias y muestra recomendaciones si algo falta.
 def run_dependency_check() -> bool:
     from deps_checker import check_all, print_status
 
@@ -39,6 +44,7 @@ def run_dependency_check() -> bool:
     return required_ok
 
 
+# Compila un programa mínimo para confirmar que las fases principales generan artefactos.
 def run_smoke_test() -> bool:
     import main
 
@@ -88,6 +94,7 @@ def run_smoke_test() -> bool:
     return True
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def main_cli() -> int:
     parser = argparse.ArgumentParser(description="Check PENTA Compiler environment.")
     parser.add_argument("--smoke-only", action="store_true", help="Run only the compiler smoke test.")

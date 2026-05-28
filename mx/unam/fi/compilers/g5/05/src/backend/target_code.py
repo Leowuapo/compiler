@@ -1,11 +1,17 @@
+# PENTA Compiler - documentación interna
+# Generación de código objetivo propio: traduce TAC a instrucciones simples que la VM puede ejecutar.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from dataclasses import dataclass
 
 
+# Representa una instrucción del código objetivo que entiende la VM.
 @dataclass
 class TargetInstruction:
     op: str
     args: list
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def __str__(self):
         op = self.op
         args = self.args
@@ -104,6 +110,7 @@ UNARY_OP_MAP = {
 }
 
 
+# Traduce cada instrucción TAC a una instrucción del target code.
 def generar_target_code(tac_instructions):
     target = []
 
@@ -213,11 +220,13 @@ def generar_target_code(tac_instructions):
     return target
 
 
+# Imprime el target code para revisión humana.
 def imprimir_target_code(instrucciones):
     for i, instr in enumerate(instrucciones):
         print(f"{i:04d}: {instr}")
 
 
+# Guarda el target code en un archivo .asm.
 def guardar_target_code(instrucciones, ruta="target_code.asm"):
     with open(ruta, "w", encoding="utf-8") as archivo:
         for instr in instrucciones:

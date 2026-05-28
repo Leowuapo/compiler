@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Tabla léxica: define los patrones regulares que reconocen comentarios, literales, operadores, palabras reservadas e identificadores.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 import re
 
 token = [

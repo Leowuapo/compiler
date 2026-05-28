@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Interfaz gráfica de PENTA Compiler: concentra la experiencia visual, la ejecución del pipeline y la consulta de artefactos generados.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 import io
 import html
 import os
@@ -60,17 +64,14 @@ import parser_sdt.syntax_parser as parser
 from parser_sdt.sdt import tabla_simbolos, tabla_funciones, formatear_valor
 
 
+# Agrupa toda la interfaz: editor, botones, pestañas de resultados, temas y acciones de compilación.
 class CompilerGUI:
-    """Interfaz moderna para el compilador Team 05.
+    """Interfaz principal de PENTA Compiler.
 
-    Mantiene el pipeline actual lexer -> parser/SDT/backend y agrega:
-    - resaltado de sintaxis tipo C usando el lexer existente,
-    - zoom de editor/resultados,
-    - tabla de tokens,
-    - errores separados,
-    - tabla de símbolos y funciones,
-    - AST visual generado con Graphviz/SVG,
-    - pestañas para TAC, TAC optimizado y código objetivo.
+    Reúne el editor de código, los controles de compilación, las pestañas
+    de resultados y los visores de artefactos. Su papel es presentar el
+    flujo completo del compilador de forma accesible sin esconder las fases
+    internas que se generan en cada ejecución.
     """
 
     THEMES = {
@@ -210,6 +211,7 @@ class CompilerGUI:
     return 0;
 }"""
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def __init__(self, root):
         self.root = root
         self.root.title("PENTA Compiler")
@@ -258,18 +260,9 @@ class CompilerGUI:
     # Layout
     # ---------------------------------------------------------------------
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _get_team_logo_path(self):
-        """Return the logo image that matches the active GUI theme.
-
-        Expected optional files under assets/:
-            logo_dark.png
-            logo_light.png
-            logo_neutral.png
-
-        If the themed logo is not available, the GUI falls back to the
-        previous generic assets/logo.png file so older installations keep
-        working without changes.
-        """
+        """Selecciona el logo más adecuado para el tema visual activo."""
         assets_dir = os.path.join(SRC_ROOT, "assets")
         candidates = [
             os.path.join(assets_dir, f"logo_{self.theme_name}.png"),
@@ -282,6 +275,7 @@ class CompilerGUI:
 
         return None
 
+    # Carga información externa y la adapta para mostrarla o procesarla.
     def _load_team_logo(self, max_size=(96, 96)):
         if not PILLOW_AVAILABLE:
             return None
@@ -302,6 +296,7 @@ class CompilerGUI:
             return None
 
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _select_code_font(self):
         preferred_fonts = [
             "JetBrains Mono",
@@ -323,6 +318,7 @@ class CompilerGUI:
         return "TkFixedFont"
 
 
+    # Ajusta estilos, eventos o parámetros visuales antes de usar la interfaz.
     def _configure_ttk_style(self):
         style = ttk.Style()
         try:
@@ -353,6 +349,7 @@ class CompilerGUI:
             foreground=[("selected", "#ffffff")],
         )
 
+    # Construye una estructura o grupo de rutas a partir del estado actual.
     def _build_layout(self):
         self.root.configure(fg_color=self.THEME['bg'])
         self.root.grid_columnconfigure(0, weight=4, uniform="main")
@@ -575,6 +572,7 @@ class CompilerGUI:
 
         self._build_graphviz_tab()
 
+    # Construye una estructura o grupo de rutas a partir del estado actual.
     def _build_ast_canvas_tab(self):
         tab = self.tabs.tab("AST Canvas")
         tab.grid_rowconfigure(1, weight=1)
@@ -598,6 +596,7 @@ class CompilerGUI:
         self.ast_canvas.bind("<ButtonPress-1>", lambda e: self.ast_canvas.scan_mark(e.x, e.y))
         self.ast_canvas.bind("<B1-Motion>", lambda e: self.ast_canvas.scan_dragto(e.x, e.y, gain=1))
 
+    # Construye una estructura o grupo de rutas a partir del estado actual.
     def _build_graphviz_tab(self):
         tab = self.tabs.tab("AST Tree")
         tab.grid_rowconfigure(1, weight=1)
@@ -630,6 +629,7 @@ class CompilerGUI:
         self.ast_info_text.configure(state="disabled")
 
 
+    # Crea componentes visuales reutilizables dentro de la interfaz.
     def _make_textbox(self, parent):
         box = ctk.CTkTextbox(
             parent,
@@ -644,6 +644,7 @@ class CompilerGUI:
         box.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         return box
 
+    # Crea componentes visuales reutilizables dentro de la interfaz.
     def _make_tree(self, parent, columns, tree_column=False):
         frame = ctk.CTkFrame(parent, fg_color=self.THEME['panel_2'], corner_radius=12)
         frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
@@ -659,10 +660,12 @@ class CompilerGUI:
         tree.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
         return tree
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _heading(self, tree, column, text, width):
         tree.heading(column, text=text)
         tree.column(column, width=width, stretch=True)
 
+    # Crea componentes visuales reutilizables dentro de la interfaz.
     def _make_instruction_view(self, parent, placeholder):
         parent.grid_rowconfigure(0, weight=0)
         parent.grid_rowconfigure(1, weight=1)
@@ -746,6 +749,7 @@ class CompilerGUI:
 
         return summary, tree
 
+    # Crea componentes visuales reutilizables dentro de la interfaz.
     def _make_vm_output_view(self, parent):
         parent.grid_rowconfigure(0, weight=0)
         parent.grid_rowconfigure(1, weight=1)
@@ -800,6 +804,7 @@ class CompilerGUI:
 
         return summary, output
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _set_vm_summary(self, widget, text, color=None):
         widget.configure(state="normal")
         widget.delete("1.0", tk.END)
@@ -808,6 +813,7 @@ class CompilerGUI:
         widget.configure(state="disabled")
         widget.xview_moveto(0)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _set_instruction_summary(self, widget, text, color=None):
         widget.configure(state="normal")
         widget.delete("1.0", tk.END)
@@ -816,6 +822,7 @@ class CompilerGUI:
         widget.configure(state="disabled")
         widget.xview_moveto(0)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _autosize_instruction_columns(self, tree, rows):
         if not rows:
             return
@@ -845,6 +852,7 @@ class CompilerGUI:
             width = max(min_width, min(max_width, widest))
             tree.column(column, width=width)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _theme_button(self, parent, text, theme_name):
         is_active = theme_name == self.theme_name
         fg = self.THEME['accent_2'] if is_active else self.THEME['panel_3']
@@ -862,6 +870,7 @@ class CompilerGUI:
             font=("Segoe UI", 11, "bold"),
         )
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def set_theme(self, theme_name):
         if theme_name not in self.THEMES:
             return
@@ -875,6 +884,7 @@ class CompilerGUI:
         ctk.set_appearance_mode(self.THEME.get('appearance', 'dark'))
         self._rebuild_interface(state)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _capture_ui_state(self):
         def get_text(widget):
             try:
@@ -898,6 +908,7 @@ class CompilerGUI:
             "status_type": getattr(self, "status_type", "success"),
         }
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _rebuild_interface(self, state):
         if self.highlight_after_id is not None:
             try:
@@ -966,6 +977,7 @@ class CompilerGUI:
             except Exception:
                 pass
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _primary_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
                              fg_color=self.THEME['accent_2'], hover_color=self.THEME.get('accent_hover'),
@@ -973,6 +985,7 @@ class CompilerGUI:
                              font=("Segoe UI", 12, "bold"))
 
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _secondary_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
                              fg_color=self.THEME['panel_3'], hover_color=self.THEME.get('button_hover'),
@@ -980,6 +993,7 @@ class CompilerGUI:
                              font=("Segoe UI", 12, "bold"))
 
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _danger_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
                              fg_color=self.THEME.get('danger'), hover_color=self.THEME.get('danger_hover'),
@@ -987,6 +1001,7 @@ class CompilerGUI:
                              font=("Segoe UI", 12, "bold"))
 
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _small_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, width=112, height=30, corner_radius=10,
                              fg_color=self.THEME['panel_3'], hover_color=self.THEME.get('button_hover'),
@@ -994,6 +1009,7 @@ class CompilerGUI:
                              font=("Segoe UI", 11, "bold"))
 
 
+    # Ajusta estilos, eventos o parámetros visuales antes de usar la interfaz.
     def _configure_text_tags(self):
         tag_styles = {
             "keyword": {"foreground": self.THEME['purple']},
@@ -1008,6 +1024,7 @@ class CompilerGUI:
         for tag, opts in tag_styles.items():
             self.code_input.tag_configure(tag, **opts)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _bind_editor_events(self):
         self.code_input.bind("<<Modified>>", self._on_text_modified)
         self.code_input.bind("<KeyRelease>", lambda _e: self.schedule_highlight())
@@ -1024,6 +1041,7 @@ class CompilerGUI:
 
         self.code_input.bind("<ButtonRelease-1>", lambda _e: self.update_line_numbers())
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _on_mousewheel(self, event):
         if event.num == 4:
             delta = -1
@@ -1038,20 +1056,24 @@ class CompilerGUI:
 
         return "break"
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _on_text_modified(self, _event=None):
         if self.code_input.edit_modified():
             self.code_input.edit_modified(False)
             self.update_line_numbers()
             self.schedule_highlight()
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _editor_yview(self, *args):
         self.code_input.yview(*args)
         self.line_numbers.yview_moveto(self.code_input.yview()[0])
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _on_editor_scroll(self, first, last, scrollbar):
         scrollbar.set(first, last)
         self.line_numbers.yview_moveto(first)
 
+    # Actualiza la interfaz o el estado interno después de un cambio relevante.
     def update_line_numbers(self):
         line_count = int(self.code_input.index("end-1c").split(".")[0])
         numbers = "\n".join(str(i).rjust(3) for i in range(1, line_count + 1))
@@ -1060,11 +1082,13 @@ class CompilerGUI:
         self.line_numbers.insert("1.0", numbers)
         self.line_numbers.configure(state="disabled")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def schedule_highlight(self):
         if self.highlight_after_id is not None:
             self.root.after_cancel(self.highlight_after_id)
         self.highlight_after_id = self.root.after(120, self.highlight_syntax)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def highlight_syntax(self):
         self.highlight_after_id = None
         code = self.get_code()
@@ -1101,29 +1125,35 @@ class CompilerGUI:
                 continue
             self.code_input.tag_add(tag, start, end)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _tag_offset(self, tag, start_offset, end_offset):
         start = f"1.0+{start_offset}c"
         end = f"1.0+{end_offset}c"
         self.code_input.tag_add(tag, start, end)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def get_code(self):
         return self.code_input.get("1.0", "end-1c")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def increase_font(self):
         self.editor_font_size = min(self.editor_font_size + 1, 24)
         self.output_font_size = min(self.output_font_size + 1, 22)
         self.apply_fonts()
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def decrease_font(self):
         self.editor_font_size = max(self.editor_font_size - 1, 8)
         self.output_font_size = max(self.output_font_size - 1, 8)
         self.apply_fonts()
 
+    # Devuelve esta parte del estado a sus valores iniciales seguros.
     def reset_font(self):
         self.editor_font_size = 12
         self.output_font_size = 11
         self.apply_fonts()
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def apply_fonts(self):
         self.code_input.configure(font=(self.code_font_family, self.editor_font_size))
         self.line_numbers.configure(font=(self.code_font_family, self.editor_font_size))
@@ -1147,6 +1177,7 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # Output/artifact organization
     # ---------------------------------------------------------------------
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _safe_run_name(self, source_path):
         if source_path and source_path != "<editor>":
             base = os.path.splitext(os.path.basename(source_path))[0]
@@ -1156,6 +1187,7 @@ class CompilerGUI:
         base = re.sub(r"[^A-Za-z0-9_.-]+", "_", base).strip("._-")
         return base or "gui_run"
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _set_output_dir(self, output_dir):
         self.current_output_dir = os.path.abspath(output_dir)
         self.current_run_name = self._safe_run_name(output_dir)
@@ -1185,6 +1217,7 @@ class CompilerGUI:
         }
 
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _prepare_output_dir(self, source_path):
         run_name = self._safe_run_name(source_path)
         output_dir = os.path.join(self.outputs_root, run_name)
@@ -1195,12 +1228,14 @@ class CompilerGUI:
         return output_dir
 
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _get_parser_result(self):
         getter = getattr(parser, "obtener_ultimo_resultado", None)
         if callable(getter):
             return getter() or {}
         return getattr(parser, "ultimo_resultado", None) or {}
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _append_success_summary(self, resultado, parser_output):
         artifacts = dict(self.current_artifacts)
         artifacts.update((resultado or {}).get("artifacts") or {})
@@ -1240,6 +1275,7 @@ class CompilerGUI:
             self.append_output("\nParser messages:\n")
             self.append_output(parser_output.strip() + "\n")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def load_generated_artifacts(self, resultado=None):
         artifacts = dict(self.current_artifacts)
         artifacts.update((resultado or {}).get("artifacts") or {})
@@ -1268,6 +1304,7 @@ class CompilerGUI:
         )
         return tac_rows, opt_rows
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def load_vm_output(self, resultado=None):
         resultado = resultado or {}
         vm_resultado = resultado.get("vm_resultado")
@@ -1327,6 +1364,7 @@ class CompilerGUI:
 
         self.vm_output_text.configure(state="disabled")
 
+    # Carga información externa y la adapta para mostrarla o procesarla.
     def _load_file_into_textbox(self, textbox, path, fallback):
         textbox.delete("1.0", tk.END)
         if not path or not os.path.exists(path):
@@ -1338,6 +1376,7 @@ class CompilerGUI:
         except Exception as exc:
             textbox.insert("1.0", f"{fallback}\nError: {exc}")
 
+    # Carga información externa y la adapta para mostrarla o procesarla.
     def _load_instruction_file(self, tree, summary_label, path, title, fallback, compare_rows=None):
         self._clear_tree(tree)
 
@@ -1386,6 +1425,7 @@ class CompilerGUI:
         self._autosize_instruction_columns(tree, rows)
         return rows
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _insert_instruction_placeholder(self, tree, message):
         self._clear_tree(tree)
         tree.insert(
@@ -1399,6 +1439,7 @@ class CompilerGUI:
             [{"num": "-", "op": "-", "arg1": "-", "arg2": "-", "result": "-", "raw": message}],
         )
 
+    # Interpreta texto o instrucciones y las convierte a una estructura más útil.
     def _parse_instruction_line(self, line, fallback_num=None):
         raw = line.rstrip()
         stripped = raw.strip()
@@ -1431,6 +1472,7 @@ class CompilerGUI:
             "category": self._instruction_category(op, body),
         }
 
+    # Interpreta texto o instrucciones y las convierte a una estructura más útil.
     def _parse_tac_instruction(self, body):
         lower = body.lower()
 
@@ -1535,6 +1577,7 @@ class CompilerGUI:
 
         return {"op": "ASSIGN", "arg1": right, "result": left}
 
+    # Interpreta texto o instrucciones y las convierte a una estructura más útil.
     def _parse_target_instruction(self, body):
         if body.endswith(":") and " " not in body:
             return {"op": "LABEL", "result": body[:-1]}
@@ -1628,6 +1671,7 @@ class CompilerGUI:
 
         return {"op": op, "arg1": operands[0] if operands else "", "arg2": operands[1] if len(operands) > 1 else "", "result": operands[2] if len(operands) > 2 else ""}
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _split_operands(self, text):
         operands = []
         current = []
@@ -1668,11 +1712,13 @@ class CompilerGUI:
 
         return operands
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _detect_generic_op(self, body):
         if body.endswith(":"):
             return "LABEL"
         return body.split(maxsplit=1)[0].upper() if body else ""
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _instruction_category(self, op, raw=""):
         op_upper = str(op).upper()
         op_raw = str(op)
@@ -1699,6 +1745,7 @@ class CompilerGUI:
             return "io"
         return "other"
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _instruction_summary(self, title, rows, compare_rows=None):
         total = len(rows)
         functions = sum(1 for row in rows if row["op"].upper() == "FUNC")
@@ -1734,15 +1781,19 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # Compilation workflow
     # ---------------------------------------------------------------------
+    # Ejecuta una compilación y sincroniza los resultados con la salida correspondiente.
     def compile_code(self):
         self._run_pipeline(mode="all")
 
+    # Ejecuta una fase o verificación concreta del flujo del compilador.
     def run_lexer_only(self):
         self._run_pipeline(mode="lexer")
 
+    # Ejecuta una fase o verificación concreta del flujo del compilador.
     def run_parser_sdt_only(self):
         self._run_pipeline(mode="parser")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _run_pipeline(self, mode="all"):
         self.reset_outputs(keep_code=True)
         self.reset_stage_cards()
@@ -1851,6 +1902,7 @@ class CompilerGUI:
                 self.update_status("Compilation failed", "error")
             self.tabs.set("Errors")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def extract_ast_text(self, output):
         if not hasattr(self, "ast_text"):
             return
@@ -1862,6 +1914,7 @@ class CompilerGUI:
         ast_part = ast_part.split("AST image generated", 1)[0]
         self.ast_text.insert("1.0", ast_part.strip())
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def extract_and_show_errors(self, output):
         self.error_text.delete("1.0", tk.END)
         error_lines = []
@@ -1877,11 +1930,13 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # Tables
     # ---------------------------------------------------------------------
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def load_tokens(self, tokens):
         self._clear_tree(self.token_tree)
         for tipo, valor, linea, columna in tokens:
             self.token_tree.insert("", tk.END, values=(tipo, valor, linea, columna))
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def load_symbol_table(self):
         self._clear_tree(self.symbol_tree)
         if not tabla_simbolos.simbolos:
@@ -1897,6 +1952,7 @@ class CompilerGUI:
                 detail = "variable"
             self.symbol_tree.insert("", tk.END, values=(name, data.get('tipo', 'unknown'), value, detail))
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def load_function_table(self):
         self._clear_tree(self.function_tree)
         if not tabla_funciones.funciones:
@@ -1906,6 +1962,7 @@ class CompilerGUI:
             params = ", ".join(f"{p.get('tipo')} {p.get('nombre')}" for p in data.get('parametros', []))
             self.function_tree.insert("", tk.END, values=(name, data.get('tipo_retorno', '-'), params or "no parameters"))
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def load_parse_table(self):
         if not hasattr(self, "parse_table_text"):
             return
@@ -1928,6 +1985,7 @@ class CompilerGUI:
         for state, gotos in list(tabla_goto.items())[:60]:
             self.parse_table_text.insert(tk.END, f"Estado {state}: {gotos}\n")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _clear_tree(self, tree):
         for item in tree.get_children():
             tree.delete(item)
@@ -1935,6 +1993,7 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # AST Treeview and Canvas
     # ---------------------------------------------------------------------
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def populate_ast_tree(self, ast):
         if not hasattr(self, "ast_tree"):
             return
@@ -1952,6 +2011,7 @@ class CompilerGUI:
             return
         add_node("", ast)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def populate_ast_tree_from_text(self):
         if not hasattr(self, "ast_tree") or not hasattr(self, "ast_text"):
             return
@@ -1974,6 +2034,7 @@ class CompilerGUI:
             else:
                 stack[level] = item
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def draw_ast_canvas(self, ast):
         if not hasattr(self, "ast_canvas"):
             return
@@ -2136,6 +2197,7 @@ class CompilerGUI:
             )
         )
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _node_box_size(self, node):
         label = self._node_label(node)
 
@@ -2162,6 +2224,7 @@ class CompilerGUI:
 
         return width, height
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def draw_ast_placeholder(self, message):
         if not hasattr(self, "ast_canvas"):
             return
@@ -2169,16 +2232,19 @@ class CompilerGUI:
         self.ast_canvas.create_text(30, 30, anchor="nw", fill=self.THEME['muted'], text=message, font=("Segoe UI", 13))
         self.ast_canvas.configure(scrollregion=(0, 0, 900, 500))
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def zoom_ast_canvas(self, factor):
         self.ast_scale = max(0.45, min(2.5, self.ast_scale * factor))
         if self.last_ast is not None:
             self.draw_ast_canvas(self.last_ast)
 
+    # Devuelve esta parte del estado a sus valores iniciales seguros.
     def reset_ast_canvas_zoom(self):
         self.ast_scale = 1.0
         if self.last_ast is not None:
             self.draw_ast_canvas(self.last_ast)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _node_label(self, node):
         tipo = str(getattr(node, "tipo", "NODE"))
         valor = self._node_value(node)
@@ -2191,6 +2257,7 @@ class CompilerGUI:
 
         return tipo
     
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _short_node_text(self, text, limit=28):
         text = str(text)
 
@@ -2199,6 +2266,7 @@ class CompilerGUI:
 
         return text[: limit - 1] + "…"
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _node_value(self, node):
         value = getattr(node, 'valor', None)
         if value is None:
@@ -2208,6 +2276,7 @@ class CompilerGUI:
         except Exception:
             return str(value)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _node_pos(self, node):
         line = getattr(node, 'linea', None)
         col = getattr(node, 'columna', None)
@@ -2215,6 +2284,7 @@ class CompilerGUI:
             return "-"
         return f"{line}:{col}"
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _ast_color(self, node_type):
         node_type = str(node_type).upper()
         palette = self.THEME.get('ast_palette', {})
@@ -2282,6 +2352,7 @@ class CompilerGUI:
 
         return palette.get('default', self.THEME['panel_2'])
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _round_rect(self, canvas, x1, y1, x2, y2, radius=12, **kwargs):
         points = [
             x1 + radius, y1, x2 - radius, y1, x2, y1, x2, y1 + radius,
@@ -2293,6 +2364,7 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # Modern Graphviz export / viewer
     # ---------------------------------------------------------------------
+    # Exporta el artefacto indicado para que pueda revisarse fuera de la GUI.
     def export_ast_graphviz_modern(self, ast):
         """
         Generates one DOT file and renders both SVG and PNG from that same DOT.
@@ -2387,6 +2459,7 @@ class CompilerGUI:
         except Exception as exc:
             self.append_output(f"\n[WARN] Could not render AST artifacts with Graphviz: {exc}\n")
 
+    # Convierte datos internos en una presentación visual o textual.
     def _render_graphviz_preview_png(self):
         """Compatibility wrapper: the PNG is generated from the DOT as a saved artifact."""
         if not GRAPHVIZ_AVAILABLE or not os.path.exists(self.ast_modern_dot_path):
@@ -2401,6 +2474,7 @@ class CompilerGUI:
         except Exception as exc:
             self.append_output(f"\n[WARN] Could not render AST PNG: {exc}\n")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def load_graphviz_image(self):
         """Updates the AST tab with links/instructions instead of embedding a PNG preview."""
         if not hasattr(self, "ast_info_text"):
@@ -2433,18 +2507,22 @@ class CompilerGUI:
 
         self.ast_info_text.configure(state="disabled")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def zoom_graphviz(self, factor):
         # PNG preview zoom was removed; keep method for backward compatibility.
         self.load_graphviz_image()
 
+    # Devuelve esta parte del estado a sus valores iniciales seguros.
     def reset_graphviz_zoom(self):
         # PNG preview zoom was removed; keep method for backward compatibility.
         self.load_graphviz_image()
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def fit_graphviz_to_view(self):
         # The browser viewer handles fit-to-screen for the SVG.
         self.open_graphviz_svg()
 
+    # Abre el recurso solicitado usando la herramienta disponible del sistema.
     def open_graphviz_svg(self):
         if not os.path.exists(self.ast_modern_svg_path):
             messagebox.showinfo("Open AST SVG", "There is no AST SVG to open yet.")
@@ -2456,6 +2534,7 @@ class CompilerGUI:
         target = self.ast_svg_viewer_path if os.path.exists(self.ast_svg_viewer_path) else self.ast_modern_svg_path
         self._open_path_in_browser(target)
 
+    # Exporta el artefacto indicado para que pueda revisarse fuera de la GUI.
     def export_graphviz_svg(self):
         if not os.path.exists(self.ast_modern_svg_path):
             messagebox.showinfo("Export AST SVG", "There is no AST SVG to export yet.")
@@ -2475,6 +2554,7 @@ class CompilerGUI:
             shutil.copyfile(self.ast_modern_svg_path, destination)
             messagebox.showinfo("Export AST SVG", f"AST SVG exported to:\n{destination}")
 
+    # Exporta el artefacto indicado para que pueda revisarse fuera de la GUI.
     def export_graphviz_image(self):
         if not os.path.exists(self.ast_png_path):
             messagebox.showinfo("Export AST PNG", "There is no AST PNG to export yet.")
@@ -2494,6 +2574,7 @@ class CompilerGUI:
             shutil.copyfile(self.ast_png_path, destination)
             messagebox.showinfo("Export AST PNG", f"AST PNG exported to:\n{destination}")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _hex_to_rgb_tuple(self, color, fallback="#000000"):
         """Converts a hex color from the active GUI theme into an RGB tuple for CSS rgba()."""
         value = str(color or fallback).strip()
@@ -2514,10 +2595,12 @@ class CompilerGUI:
             except Exception:
                 return (0, 0, 0)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _rgba(self, color, alpha=1.0, fallback="#000000"):
         r, g, b = self._hex_to_rgb_tuple(color, fallback)
         return f"rgba({r}, {g}, {b}, {alpha})"
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _theme_css_variables(self):
         """Builds CSS variables from the active GUI theme for external HTML viewers."""
         theme = self.THEME
@@ -2566,6 +2649,7 @@ class CompilerGUI:
         lines.append("}")
         return "\n".join(lines)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _write_ast_svg_viewer(self):
         if not os.path.exists(self.ast_modern_svg_path):
             return
@@ -2708,6 +2792,7 @@ class CompilerGUI:
         with open(self.ast_svg_viewer_path, "w", encoding="utf-8") as f:
             f.write(doc)
 
+    # Abre el recurso solicitado usando la herramienta disponible del sistema.
     def open_ast_folder(self):
         path = getattr(self, "ast_dir", None) or self.current_output_dir
         if not path or not os.path.exists(path):
@@ -2719,11 +2804,13 @@ class CompilerGUI:
     # Status and output helpers
     # ---------------------------------------------------------------------
 
+    # Devuelve esta parte del estado a sus valores iniciales seguros.
     def reset_stage_cards(self):
         self.set_stage("lexico", "idle")
         self.set_stage("sintactico", "idle")
         self.set_stage("semantico", "idle")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def set_stage(self, stage, state):
         names = {"lexico": "Lexical", "sintactico": "Syntax", "semantico": "Semantic"}
         icons = {"idle": "○", "pending": "…", "success": "✓", "error": "✕"}
@@ -2737,20 +2824,24 @@ class CompilerGUI:
         label = self.stage_cards[stage]
         label.configure(text=f"{icons[state]} {names[stage]}", text_color=colors[state])
 
+    # Actualiza la interfaz o el estado interno después de un cambio relevante.
     def update_status(self, message, status_type="normal"):
         self.status_text = message
         self.status_type = status_type
         colors = {"success": self.THEME['success'], "error": self.THEME['error'], "warning": self.THEME['warning'], "normal": self.THEME['muted']}
         self.status_label.configure(text=message, text_color=colors.get(status_type, self.THEME['muted']))
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def append_output(self, text):
         self.output_text.insert(tk.END, text)
         self.output_text.see(tk.END)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def append_error(self, text):
         self.error_text.insert(tk.END, text + "\n")
         self.error_text.see(tk.END)
 
+    # Devuelve esta parte del estado a sus valores iniciales seguros.
     def reset_outputs(self, keep_code=True):
         for box in [self.output_text, self.error_text, self.vm_output_text]:
             box.configure(state="normal")
@@ -2779,11 +2870,13 @@ class CompilerGUI:
             self.schedule_highlight()
         self.set_placeholder_texts()
 
+    # Limpia datos visibles o temporales para iniciar una nueva corrida.
     def clear_all(self):
         self.reset_outputs(keep_code=False)
         self.reset_stage_cards()
         self.tabs.set("Output")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def set_placeholder_texts(self):
         instruction_placeholders = [
             (self.tac_tree, self.tac_summary_label, "TAC", "Compile code to generate TAC."),
@@ -2818,6 +2911,7 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # Grammar viewer
     # ---------------------------------------------------------------------
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _ensure_grammar_viewer(self, silent=False):
         """Generates assets/grammar/index.html once, outside compilation output folders."""
         try:
@@ -2911,6 +3005,7 @@ class CompilerGUI:
         self.grammar_html_path = grammar_path
         return grammar_path
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def show_grammar_window(self):
         """Opens the grammar viewer generated under assets/grammar instead of outputs/<run>."""
         grammar_path = self._ensure_grammar_viewer(silent=False)
@@ -2919,6 +3014,7 @@ class CompilerGUI:
         self.update_status("Grammar viewer opened", "success")
         self._open_path_in_browser(grammar_path)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _open_path_in_browser(self, path):
         path = os.path.abspath(path)
         if sys.platform == "darwin":
@@ -2933,6 +3029,7 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # File operations
     # ---------------------------------------------------------------------
+    # Abre el recurso solicitado usando la herramienta disponible del sistema.
     def open_file(self):
         path = filedialog.askopenfilename(
             title="Open source file",
@@ -2953,6 +3050,7 @@ class CompilerGUI:
         self.schedule_highlight()
         self.update_status(f"Archivo cargado: {os.path.basename(path)}", "success")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def save_file(self):
         path = filedialog.asksaveasfilename(
             title="Save code",
@@ -2967,6 +3065,7 @@ class CompilerGUI:
         self.update_status(f"Code saved: {os.path.basename(path)}", "success")
 
 
+# Coordina el modo de ejecución cuando el archivo se llama desde terminal.
 def main():
     root = ctk.CTk()
     app = CompilerGUI(root)

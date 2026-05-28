@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Reglas de tipos: normaliza tipos válidos, infiere constantes y aplica conversiones compatibles.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from .errors import error_semantico
 from .values import ValorDesconocido, es_string_literal, es_valor_desconocido
 
@@ -12,12 +16,14 @@ RANGOS = {
     "long": (-9223372036854775808, 9223372036854775807),
 }
 
+# Valida que un tipo exista dentro del lenguaje soportado.
 def normalizar_tipo(tipo, posiciones=None, indice=0):
     if tipo not in VALID_TYPES:
         error_semantico(f"unknown type '{tipo}'", posiciones, indice)
     return tipo
 
 
+# Obtiene el tipo semántico de una constante ya parseada.
 def inferir_tipo_constante(valor, nodo=None):
     if es_string_literal(valor):
         return "string"
@@ -36,6 +42,7 @@ def inferir_tipo_constante(valor, nodo=None):
 
     error_semantico(f"invalid constant '{valor}'", nodo=nodo)
 
+# Determina si un valor de un tipo puede convertirse a otro tipo permitido.
 def tipos_convertibles(tipo_origen, tipo_destino):
     tipo_origen = normalizar_tipo(tipo_origen)
     tipo_destino = normalizar_tipo(tipo_destino)
@@ -61,6 +68,7 @@ def tipos_convertibles(tipo_origen, tipo_destino):
     return False
 
 
+# Convierte valores al tipo de destino respetando rangos y restricciones.
 def convertir_a_tipo(valor, tipo_destino, nombre_var=None, posiciones=None, indice=0, nodo=None):
     tipo_destino = normalizar_tipo(tipo_destino, posiciones, indice)
     etiqueta = f" for variable '{nombre_var}'" if nombre_var else ""

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# PENTA Compiler - documentación interna
+# Revisión de dependencias del entorno: ayuda a detectar si Python, Tkinter, CustomTkinter, Pillow y Graphviz están listos.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 """
 Cross-platform dependency checker for PENTA Compiler.
 
@@ -19,6 +23,7 @@ from typing import Callable
 MIN_PYTHON = (3, 10)
 
 
+# Guarda el estado de una dependencia junto con un mensaje de diagnóstico.
 @dataclass(frozen=True)
 class DependencyResult:
     ok: bool
@@ -26,6 +31,7 @@ class DependencyResult:
     required: bool = False
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _platform_key() -> str:
     system = platform.system().lower()
     if system.startswith("darwin"):
@@ -37,6 +43,7 @@ def _platform_key() -> str:
     return "unknown"
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _recommendations() -> dict[str, str]:
     system = _platform_key()
 
@@ -88,6 +95,7 @@ def _recommendations() -> dict[str, str]:
     }
 
 
+# Comprueba que la versión de Python cumple con el mínimo requerido.
 def check_python() -> tuple[bool, str]:
     current = sys.version_info[:3]
     ok = current >= MIN_PYTHON
@@ -97,6 +105,7 @@ def check_python() -> tuple[bool, str]:
     return ok, info
 
 
+# Verifica que Tkinter esté disponible para la interfaz gráfica.
 def check_tkinter() -> tuple[bool, str]:
     try:
         import tkinter as tk  # noqa: F401
@@ -105,6 +114,7 @@ def check_tkinter() -> tuple[bool, str]:
         return False, f"Tkinter not available: {exc}"
 
 
+# Verifica que CustomTkinter esté instalado para la GUI moderna.
 def check_customtkinter() -> tuple[bool, str]:
     try:
         import customtkinter as ctk  # noqa: F401
@@ -114,6 +124,7 @@ def check_customtkinter() -> tuple[bool, str]:
         return False, f"CustomTkinter not available: {exc}"
 
 
+# Verifica que Pillow esté disponible para cargar imágenes y logos.
 def check_pillow() -> tuple[bool, str]:
     try:
         from PIL import Image  # noqa: F401
@@ -122,6 +133,7 @@ def check_pillow() -> tuple[bool, str]:
         return False, f"Pillow not available: {exc}"
 
 
+# Verifica que el comando dot de Graphviz esté disponible en el sistema.
 def check_graphviz() -> tuple[bool, str]:
     dot_path = shutil.which("dot")
     if not dot_path:
@@ -144,6 +156,7 @@ def check_graphviz() -> tuple[bool, str]:
     return False, f"Graphviz command failed: {version_output or 'unknown error'} ({dot_path})"
 
 
+# Agrupa todas las revisiones de entorno en una sola respuesta estructurada.
 def check_all():
     """
     Returns: (required_ok, results, recommendations)
@@ -177,6 +190,7 @@ def check_all():
     return required_ok, results, recommendations
 
 
+# Muestra en consola el estado de cada dependencia revisada.
 def print_status(resultados=None):
     if resultados is None:
         _, resultados, _ = check_all()
@@ -195,6 +209,7 @@ def print_status(resultados=None):
     print("=" * 64 + "\n")
 
 
+# Presenta un aviso visual cuando la GUI puede abrir, pero faltan componentes recomendados.
 def show_gui_warning(missing_deps, recommendations):
     """Shows a GUI warning for missing optional dependencies."""
     from tkinter import messagebox

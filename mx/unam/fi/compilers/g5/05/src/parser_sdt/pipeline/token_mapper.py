@@ -1,10 +1,11 @@
-"""Token mapper used by the LALR parser.
+# PENTA Compiler - documentación interna
+# Adaptador entre lexer y parser: convierte tokens crudos en símbolos terminales entendidos por la tabla LALR.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
 
-It converts lexer tokens into parser symbols, lexemes and source positions.
-The mapping is unchanged from the previous syntax_parser.py implementation.
-"""
+"""Mapeo entre tokens del lexer y símbolos terminales del parser."""
 
 
+# Traduce la salida del lexer al vocabulario de terminales usado por el parser LALR.
 def mapear_tokens(tokens):
     simbolos = []
     lexemas = []

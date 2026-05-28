@@ -1,3 +1,8 @@
+/* PENTA Compiler - documentación interna
+   Estilos del visor de gramática. Las secciones separan tema, layout,
+   tarjetas, tabla y comportamiento responsive. */
+
+/* Variables de tema: colores compartidos por toda la vista. */
 :root {
     color-scheme: dark;
     --bg: #0f172a;
@@ -24,20 +29,24 @@
     --focus-ring: rgba(56,189,248,.16);
     --shadow-color: rgba(0,0,0,.28);
 }
+/* Base global: mantiene tamaños consistentes entre navegadores. */
 * {
     box-sizing: border-box;
 }
+/* Fondo y tipografía general del visor. */
 body {
     margin: 0;
     background: radial-gradient(circle at top left,var(--panel3) 0,var(--bg) 34rem);
     color: var(--text);
     font-family: Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 }
+/* Contenedor central para evitar líneas demasiado largas. */
 .page {
     max-width: 1200px;
     margin: 0 auto;
     padding: 32px 24px 48px;
 }
+/* Tarjeta superior con título y estadísticas. */
 header {
     background: var(--header-bg);
     border: 1px solid var(--border);
@@ -70,6 +79,7 @@ h1 {
 .stat strong {
     color: var(--accent);
 }
+/* Barra fija de búsqueda para filtrar producciones. */
 .toolbar {
     position: sticky;
     top: 0;
@@ -95,6 +105,7 @@ input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--focus-ring);
 }
+/* Leyenda de símbolos usados en las producciones. */
 .legend {
     display: flex;
     gap: 10px;
@@ -109,11 +120,13 @@ input:focus {
     padding: 5px 10px;
     background: var(--pill-bg);
 }
+/* Rejilla adaptable de tarjetas de gramática. */
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit,minmax(330px,1fr));
     gap: 14px;
 }
+/* Tarjeta individual: lado izquierdo LHS, lado derecho alternativas RHS. */
 .grammar-card {
     display: grid;
     grid-template-columns: minmax(130px,.7fr) minmax(0,2fr);
@@ -163,6 +176,7 @@ input:focus {
     color: var(--yellow);
     font-weight: 800;
 }
+/* Tabla lineal desplegable para consulta detallada. */
 details {
     margin-top: 22px;
 }
@@ -202,6 +216,7 @@ td {
 .hidden {
     display: none!important;
 }
+/* Ajustes para pantallas pequeñas. */
 @media(max-width:720px) {
     .grammar-card {
         grid-template-columns: 1fr;

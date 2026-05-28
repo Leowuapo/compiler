@@ -1,15 +1,23 @@
+# PENTA Compiler - documentación interna
+# Tablas semánticas: administra variables, arreglos, matrices y funciones por ámbito.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from .errors import error_semantico
 from .types import convertir_a_tipo, normalizar_tipo
 from .values import ValorDesconocido, es_valor_desconocido, formatear_valor
 
 
+# Controla variables, arreglos y matrices declaradas dentro de un ámbito.
 class TablaSimbolos:
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def __init__(self):
         self.simbolos = {}
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def limpiar(self):
         self.simbolos = {}
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def declarar(self, nombre, tipo, posiciones=None, indice=0):
         tipo = normalizar_tipo(tipo, posiciones, indice)
         if tipo == "void":
@@ -18,6 +26,7 @@ class TablaSimbolos:
             error_semantico(f"variable '{nombre}' already declared", posiciones, indice)
         self.simbolos[nombre] = {'tipo': tipo, 'valor': None}
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def asignar(self, nombre, valor, posiciones=None, indice=0):
         if nombre not in self.simbolos:
             error_semantico(f"variable '{nombre}' not declared", posiciones, indice)
@@ -26,11 +35,13 @@ class TablaSimbolos:
             valor, tipo_destino, nombre, posiciones, indice
         )
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def obtener(self, nombre, posiciones=None, indice=0):
         if nombre not in self.simbolos:
             error_semantico(f"variable '{nombre}' not declared", posiciones, indice)
         return self.simbolos[nombre]
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def mostrar(self):
         for nombre, datos in self.simbolos.items():
             if datos.get('es_array', False):
@@ -55,6 +66,7 @@ class TablaSimbolos:
                     f"value: {formatear_valor(datos['valor'])}"
                 )
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def declarar_array(self, nombre, tipo, tamano, posiciones=None, indice=0):
         tipo = normalizar_tipo(tipo, posiciones, indice)
 
@@ -77,6 +89,7 @@ class TablaSimbolos:
             'tamano': tamano
         }
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def declarar_matriz(self, nombre, tipo, filas, columnas, posiciones=None, indice=0):
         tipo = normalizar_tipo(tipo, posiciones, indice)
 
@@ -105,6 +118,7 @@ class TablaSimbolos:
             'columnas': columnas
         }
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def asignar_array(self, nombre, indice_array, valor, posiciones=None, indice=0, nodo=None):
         if nombre not in self.simbolos:
             error_semantico(f"array '{nombre}' not declared", posiciones, indice, nodo)
@@ -145,6 +159,7 @@ class TablaSimbolos:
             nodo
         )
     
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def asignar_matriz(self, nombre, fila, columna, valor, posiciones=None, indice=0, nodo=None):
         if nombre not in self.simbolos:
             error_semantico(f"matrix '{nombre}' not declared", posiciones, indice, nodo)
@@ -190,6 +205,7 @@ class TablaSimbolos:
             nodo
         )
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def obtener_array(self, nombre, indice_array, posiciones=None, indice=0, nodo=None):
         if nombre not in self.simbolos:
             error_semantico(f"array '{nombre}' not declared", posiciones, indice, nodo)
@@ -228,6 +244,7 @@ class TablaSimbolos:
 
         return valor, datos['tipo']
     
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def obtener_matriz(self, nombre, fila, columna, posiciones=None, indice=0, nodo=None):
         if nombre not in self.simbolos:
             error_semantico(f"matrix '{nombre}' not declared", posiciones, indice, nodo)
@@ -271,13 +288,17 @@ class TablaSimbolos:
 
         return valor, datos['tipo']
     
+# Controla firmas de funciones, tipos de retorno y parámetros declarados.
 class TablaFunciones:
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def __init__(self):
         self.funciones = {}
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def limpiar(self):
         self.funciones = {}
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def declarar(self, nombre, tipo_retorno, parametros=None, posiciones=None, indice=0):
         tipo_retorno = normalizar_tipo(tipo_retorno, posiciones, indice)
 
@@ -313,12 +334,14 @@ class TablaFunciones:
             'parametros': parametros
         }
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def obtener(self, nombre, posiciones=None, indice=0):
         if nombre not in self.funciones:
             error_semantico(f"function '{nombre}' not declared", posiciones, indice)
 
         return self.funciones[nombre]
 
+    # Opera sobre la tabla semántica cuidando tipos, rangos y existencia de símbolos.
     def mostrar(self):
         for nombre, datos in self.funciones.items():
             params = ", ".join(
@@ -330,4 +353,3 @@ class TablaFunciones:
                 f"{nombre} -> return type: {datos['tipo_retorno']}, "
                 f"params: ({params})"
             )
-

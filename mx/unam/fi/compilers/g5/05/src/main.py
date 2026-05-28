@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Punto de entrada por terminal: recibe código fuente, ejecuta lexer/parser y guarda los artefactos de compilación.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 import argparse
 import os
 import re
@@ -13,6 +17,7 @@ import parser_sdt.syntax_parser as parser
 OUTPUTS_ROOT = os.path.join(SRC_ROOT, "outputs")
 
 
+# Convierte nombres de archivos o corridas en identificadores seguros para rutas.
 def _slugify(value):
     value = str(value or "run")
     value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value)
@@ -20,6 +25,7 @@ def _slugify(value):
     return value or "run"
 
 
+# Construye una carpeta de salida estable a partir del archivo o de una etiqueta de ejecución.
 def _default_output_dir(source_path=None, label="terminal_session"):
     if source_path:
         base = os.path.splitext(os.path.basename(source_path))[0]
@@ -29,6 +35,7 @@ def _default_output_dir(source_path=None, label="terminal_session"):
     return os.path.join(OUTPUTS_ROOT, _slugify(base))
 
 
+# Valida que el lexer produjo tokens y entrega la secuencia al parser.
 def _compile_tokens(tokens, *, source_path=None, output_dir=None, verbose=False):
     if not tokens:
         print("Lexer error...")
@@ -45,6 +52,7 @@ def _compile_tokens(tokens, *, source_path=None, output_dir=None, verbose=False)
     )
 
 
+# Compila un archivo fuente y guarda los resultados en la carpeta de salida correspondiente.
 def compile_file(source_path, *, output_dir=None, verbose=False):
     output_dir = output_dir or _default_output_dir(source_path)
     tokens = lector.analizearchive(source_path)
@@ -56,6 +64,7 @@ def compile_file(source_path, *, output_dir=None, verbose=False):
     )
 
 
+# Compila código recibido como texto directo desde terminal o desde pruebas automatizadas.
 def compile_terminal(code, *, output_dir=None, verbose=False):
     output_dir = output_dir or _default_output_dir(label="terminal_session")
     tokens = lector.analizeterminal(code)
@@ -67,6 +76,7 @@ def compile_terminal(code, *, output_dir=None, verbose=False):
     )
 
 
+# Permite elegir entrada por archivo o por terminal cuando no se pasa una ruta directa.
 def interactive_mode(*, output_dir=None, verbose=False):
     while True:
         seleccion = input("Select how you will enter your code (archive/terminal): ").strip().lower()
@@ -94,6 +104,7 @@ def interactive_mode(*, output_dir=None, verbose=False):
                 print("Error: Invalid option. Please try again.\n")
 
 
+# Define los argumentos disponibles para usar el compilador desde consola.
 def parse_args():
     arg_parser = argparse.ArgumentParser(
         description="Compile a source file or terminal input with the Team 5 compiler."
@@ -122,6 +133,7 @@ def parse_args():
     return arg_parser.parse_args()
 
 
+# Coordina el modo de ejecución cuando el archivo se llama desde terminal.
 def main():
     args = parse_args()
 

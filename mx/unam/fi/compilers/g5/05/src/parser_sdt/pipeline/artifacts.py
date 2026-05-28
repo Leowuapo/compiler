@@ -1,13 +1,14 @@
-"""Artifact path helpers for parser/SDT runs.
+# PENTA Compiler - documentación interna
+# Utilidades de rutas: centraliza nombres de carpetas y archivos generados por cada corrida del compilador.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
 
-This module only centralizes the output-folder naming logic that previously
-lived in syntax_parser.py. It intentionally keeps the same behavior.
-"""
+"""Helpers para construir rutas de artefactos del pipeline."""
 
 import os
 import re
 
 
+# Normaliza texto para usarlo como nombre seguro de archivo o carpeta.
 def slugify(value):
     value = str(value or "run")
     value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value)
@@ -15,6 +16,7 @@ def slugify(value):
     return value or "run"
 
 
+# Elige el nombre base de una corrida usando la fuente o la carpeta de salida.
 def run_name_from_source(source_path=None, output_dir=None):
     if source_path and source_path not in {"<terminal>", "<editor>", "<unknown>"}:
         base = os.path.splitext(os.path.basename(source_path))[0]
@@ -25,6 +27,7 @@ def run_name_from_source(source_path=None, output_dir=None):
     return slugify(base)
 
 
+# Construye todas las rutas de AST, IR y target code para una corrida.
 def build_artifact_paths(output_dir=None, ast_base_path="ast", source_path=None):
     run_name = run_name_from_source(source_path, output_dir)
 

@@ -1,6 +1,10 @@
 <!doctype html>
+<!-- PENTA Compiler - documentación interna
+     Vista HTML del visor de gramática. Los comentarios describen la
+     estructura visual sin cambiar el contenido generado ni los scripts. -->
 <html lang="es">
 <head>
+  <!-- Metadatos, estilos base y variables de tema. -->
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Current grammar - PENTA Compiler</title>
@@ -10,7 +14,9 @@
   </style>
 </head>
 <body>
+  <!-- Contenedor principal del visor de gramática. -->
   <div class="page">
+    <!-- Encabezado con título y métricas de la gramática cargada. -->
     <header>
       <h1>Current grammar</h1>
       <p class="subtitle">Compact productions from <code>parser_sdt/parsertable.py</code>.</p>
@@ -23,18 +29,22 @@
       </div>
     </header>
 
+    <!-- Buscador: filtra grupos de producciones sin recargar la página. -->
     <div class="toolbar">
       <input id="search" type="search" placeholder="Search: FunctionDecl, return, E, printf, array...">
     </div>
 
+    <!-- Leyenda visual para distinguir terminales, no terminales y epsilon. -->
     <div class="legend">
       <span class="pill"><span class="nonterminal">Nonterminal</span></span>
       <span class="pill"><span class="terminal">Terminal</span></span>
       <span class="pill"><span class="epsilon">ε</span> empty production</span>
     </div>
 
+    <!-- Tarjetas principales: cada grupo reúne las alternativas de un no terminal. -->
     <main class="grid">{{GRAMMAR_CARDS}}</main>
 
+    <!-- Tabla lineal opcional para revisar las producciones en orden numérico. -->
     <details>
       <summary>Ver tabla lineal de productions</summary>
       <table>
@@ -45,6 +55,7 @@
       </table>
     </details>
   </div>
+  <!-- Comportamiento del buscador y actualización del conteo visible. -->
   <script src="grammar.js"></script>
 </body>
 </html>

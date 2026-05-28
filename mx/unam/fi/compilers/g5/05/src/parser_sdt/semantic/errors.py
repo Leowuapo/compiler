@@ -1,3 +1,8 @@
+# PENTA Compiler - documentación interna
+# Errores semánticos: construye mensajes con ubicación cuando hay línea y columna disponibles.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
+# Lanza un error semántico con mensaje claro y posición si está disponible.
 def error_semantico(mensaje, posiciones=None, indice=0, nodo=None):
     """Lanza errores semánticos con ubicación cuando está disponible."""
     if nodo is not None and getattr(nodo, "linea", None) is not None:

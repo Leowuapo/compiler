@@ -1,11 +1,18 @@
+# PENTA Compiler - documentación interna
+# Máquina virtual de PENTA: interpreta el target code, maneja funciones, memoria local, arreglos, matrices y salida del programa.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 import ast
 
 
+# Señala errores ocurridos durante la ejecución del target code.
 class VMError(Exception):
     pass
 
 
+# Ejecuta el código objetivo usando frames locales, etiquetas y llamadas a función.
 class VirtualMachine:
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def __init__(self, instructions):
         self.instructions = instructions
         self.functions = {}
@@ -16,6 +23,7 @@ class VirtualMachine:
 
         self._index_program()
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _index_program(self):
         current_function = None
 
@@ -36,6 +44,7 @@ class VirtualMachine:
             elif instr.op == "LABEL" and current_function is not None:
                 self.labels[(current_function, instr.args[0])] = index
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def run(self, entry_point="main"):
         if entry_point not in self.functions:
             raise VMError(f"entry point '{entry_point}' not found")
@@ -47,6 +56,7 @@ class VirtualMachine:
             "output": self.output,
         }
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _new_frame(self):
         return {
             "locals": {},
@@ -54,6 +64,7 @@ class VirtualMachine:
             "matrices": {},
         }
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _run_function(self, function_name, args):
         if function_name not in self.functions:
             raise VMError(f"function '{function_name}' not found")
@@ -225,6 +236,7 @@ class VirtualMachine:
 
         return None
 
+    # Resuelve saltos hacia etiquetas dentro de la función en ejecución.
     def _jump_to(self, function_name, label):
         key = (function_name, label)
 
@@ -233,6 +245,7 @@ class VirtualMachine:
 
         return self.labels[key]
 
+    # Evalúa operandos o expresiones internas durante la ejecución de la VM.
     def _eval(self, value, frame):
         if value is None:
             return None
@@ -257,6 +270,7 @@ class VirtualMachine:
 
         return value
 
+    # Valida una condición pequeña usada por el flujo principal sin modificar estado.
     def _is_quoted_literal(self, value):
         return (
             isinstance(value, str)
@@ -267,6 +281,7 @@ class VirtualMachine:
             )
         )
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _numeric(self, value):
         if isinstance(value, bool):
             return 1 if value else 0
@@ -282,12 +297,14 @@ class VirtualMachine:
 
         raise VMError(f"value '{value}' is not numeric")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _truthy(self, value):
         if isinstance(value, str) and len(value) == 1:
             return ord(value) != 0
 
         return bool(value)
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _as_index(self, value):
         value = self._numeric(value)
 
@@ -296,6 +313,7 @@ class VirtualMachine:
 
         return value
 
+    # Evalúa operandos o expresiones internas durante la ejecución de la VM.
     def _eval_binary(self, op, left, right, frame):
         a = self._eval(left, frame)
         b = self._eval(right, frame)
@@ -356,6 +374,7 @@ class VirtualMachine:
 
         raise VMError(f"unsupported binary op '{op}'")
 
+    # Evalúa operandos o expresiones internas durante la ejecución de la VM.
     def _eval_unary(self, op, value, frame):
         value = self._eval(value, frame)
 
@@ -370,12 +389,14 @@ class VirtualMachine:
 
         raise VMError(f"unsupported unary op '{op}'")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def _compare_value(self, value):
         if isinstance(value, str) and len(value) == 1:
             return ord(value)
 
         return value
 
+    # Da formato a valores de salida respetando las reglas esperadas por el lenguaje.
     def _format_printf(self, fmt, values):
         result = []
         arg_index = 0
@@ -432,6 +453,7 @@ class VirtualMachine:
         return "".join(result)
 
 
+# Ejecuta el código objetivo usando la VM y devuelve salida/retorno.
 def ejecutar_target_code(instructions, entry_point="main", mostrar_salida=True):
     vm = VirtualMachine(instructions)
     resultado = vm.run(entry_point)

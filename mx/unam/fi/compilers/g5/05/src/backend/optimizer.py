@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Optimización de TAC: aplica propagación de constantes/copias, simplificación algebraica y eliminación segura de temporales muertos.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from .tac import TACInstruction
 
 
@@ -17,10 +21,12 @@ BARRIER_OPS = {"FUNC", "END_FUNC", "LABEL"}
 # Utilidades generales
 # ------------------------------------------------------------
 
+# Valida una condición pequeña usada por el flujo principal sin modificar estado.
 def _is_temp(value):
     return isinstance(value, str) and value.startswith("t") and value[1:].isdigit()
 
 
+# Valida una condición pequeña usada por el flujo principal sin modificar estado.
 def _is_quoted_literal(value):
     if not isinstance(value, str):
         return False
@@ -34,10 +40,12 @@ def _is_quoted_literal(value):
     )
 
 
+# Valida una condición pequeña usada por el flujo principal sin modificar estado.
 def _is_bool_text(value):
     return value in {"true", "false"}
 
 
+# Valida una condición pequeña usada por el flujo principal sin modificar estado.
 def _is_variable_name(value):
     if not isinstance(value, str):
         return False
@@ -51,6 +59,7 @@ def _is_variable_name(value):
     return True
 
 
+# Interpreta texto o instrucciones y las convierte a una estructura más útil.
 def _parse_literal(value):
     if isinstance(value, (int, float, bool)):
         return value
@@ -64,6 +73,7 @@ def _parse_literal(value):
     return value
 
 
+# Valida una condición pequeña usada por el flujo principal sin modificar estado.
 def _is_constant(value):
     parsed = _parse_literal(value)
 
@@ -76,11 +86,13 @@ def _is_constant(value):
     return False
 
 
+# Valida una condición pequeña usada por el flujo principal sin modificar estado.
 def _is_numeric_or_bool_constant(value):
     parsed = _parse_literal(value)
     return isinstance(parsed, (int, float, bool))
 
 
+# Valida una condición pequeña usada por el flujo principal sin modificar estado.
 def _is_truthy_constant(value):
     parsed = _parse_literal(value)
 
@@ -90,6 +102,7 @@ def _is_truthy_constant(value):
     return None
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _clone(instr, **changes):
     data = {
         "op": instr.op,
@@ -108,6 +121,7 @@ def _clone(instr, **changes):
     )
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _resolve(value, env):
     """
     Resuelve propagación de constantes/copias.
@@ -131,6 +145,7 @@ def _resolve(value, env):
     return current
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _kill_name(env, name):
     """
     Si una variable se redefine, invalidamos:
@@ -155,11 +170,13 @@ def _kill_name(env, name):
 # Usos y definiciones para dead temporary elimination
 # ------------------------------------------------------------
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _add_use(uses, value):
     if _is_variable_name(value):
         uses.add(value)
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _add_uses_from_tuple(uses, value_tuple):
     if not isinstance(value_tuple, tuple):
         return
@@ -168,6 +185,7 @@ def _add_uses_from_tuple(uses, value_tuple):
         _add_use(uses, item)
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _uses(instr):
     uses = set()
 
@@ -229,6 +247,7 @@ def _uses(instr):
     return uses
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _defs(instr):
     if instr.op in BIN_OPS | UNARY_OPS:
         return {instr.result} if _is_variable_name(instr.result) else set()
@@ -248,6 +267,7 @@ def _defs(instr):
     return set()
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _has_side_effect(instr):
     return instr.op in {
         "FUNC", "END_FUNC", "LABEL",
@@ -264,6 +284,7 @@ def _has_side_effect(instr):
 # Constant folding y algebraic simplification
 # ------------------------------------------------------------
 
+# Evalúa operandos o expresiones internas durante la ejecución de la VM.
 def _eval_binary(op, arg1, arg2):
     a = _parse_literal(arg1)
     b = _parse_literal(arg2)
@@ -329,6 +350,7 @@ def _eval_binary(op, arg1, arg2):
     return None
 
 
+# Evalúa operandos o expresiones internas durante la ejecución de la VM.
 def _eval_unary(op, arg):
     value = _parse_literal(arg)
 
@@ -347,6 +369,7 @@ def _eval_unary(op, arg):
     return None
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _simplify_algebraic(instr):
     op = instr.op
     a = _parse_literal(instr.arg1)
@@ -398,6 +421,7 @@ def _simplify_algebraic(instr):
     return instr
 
 
+# Aplica constant folding y simplificaciones algebraicas a una instrucción.
 def fold_and_simplify_instruction(instr):
     if instr.op in BIN_OPS:
         folded = _eval_binary(instr.op, instr.arg1, instr.arg2)
@@ -420,6 +444,7 @@ def fold_and_simplify_instruction(instr):
 # Sustitución de operandos
 # ------------------------------------------------------------
 
+# Reemplaza operandos por valores conocidos cuando es seguro hacerlo.
 def substitute_operands(instr, env):
     if instr.op == "ASSIGN":
         return _clone(instr, arg1=_resolve(instr.arg1, env))
@@ -492,6 +517,7 @@ def substitute_operands(instr, env):
 # Constant propagation / copy propagation / branch simplification
 # ------------------------------------------------------------
 
+# Actualiza la interfaz o el estado interno después de un cambio relevante.
 def _update_env_from_instruction(instr, env):
     if instr.op == "CALL":
         # Una llamada puede tener efectos secundarios. Conservador:
@@ -521,6 +547,7 @@ def _update_env_from_instruction(instr, env):
                 env[instr.result] = value
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def optimize_branches(instr):
     if instr.op == "IF_FALSE":
         truth = _is_truthy_constant(instr.arg1)
@@ -547,6 +574,7 @@ def optimize_branches(instr):
     return instr
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def constant_and_copy_propagation(instructions):
     optimized = []
     env = {}
@@ -577,6 +605,7 @@ def constant_and_copy_propagation(instructions):
 # Limpieza de código muerto y saltos
 # ------------------------------------------------------------
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def remove_dead_code_after_jumps(instructions):
     optimized = []
     unreachable = False
@@ -598,6 +627,7 @@ def remove_dead_code_after_jumps(instructions):
     return optimized
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def remove_redundant_gotos(instructions):
     optimized = []
 
@@ -621,6 +651,7 @@ def remove_redundant_gotos(instructions):
     return optimized
 
 
+# Quita etiquetas que no son destino de ningún salto.
 def remove_unused_labels(instructions):
     used_labels = set()
 
@@ -639,6 +670,7 @@ def remove_unused_labels(instructions):
     return optimized
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def remove_redundant_assignments(instructions):
     optimized = []
 
@@ -651,6 +683,7 @@ def remove_redundant_assignments(instructions):
     return optimized
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def remove_dead_temporaries(instructions):
     """
     Elimina asignaciones a temporales que nunca se usan.
@@ -690,6 +723,7 @@ def remove_dead_temporaries(instructions):
 # ------------------------------------------------------------
 # Pipeline principal
 # ------------------------------------------------------------
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _as_int_constant(value):
     value = _parse_literal(value)
 
@@ -702,6 +736,7 @@ def _as_int_constant(value):
     return None
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _value_contains_temp(value):
     if _is_temp(value):
         return True
@@ -715,6 +750,7 @@ def _value_contains_temp(value):
     return False
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _max_temp_index(instructions):
     max_index = 0
 
@@ -740,6 +776,7 @@ def _max_temp_index(instructions):
     return max_index
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _find_label(instructions, label, start):
     for i in range(start, len(instructions)):
         if instructions[i].op == "LABEL" and instructions[i].result == label:
@@ -748,6 +785,7 @@ def _find_label(instructions, label, start):
     return None
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _last_goto_to_label(instructions, label, start, end):
     result = None
 
@@ -758,6 +796,7 @@ def _last_goto_to_label(instructions, label, start, end):
     return result
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _compute_iteration_count(start, bound, cmp_op, step):
     if step == 0:
         return None
@@ -777,6 +816,7 @@ def _compute_iteration_count(start, bound, cmp_op, step):
     return None
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _replace_value_for_unroll(value, induction_var, induction_value, temp_map):
     if value == induction_var:
         return induction_value
@@ -799,6 +839,7 @@ def _replace_value_for_unroll(value, induction_var, induction_value, temp_map):
     return value
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _clone_instruction_for_unroll(instr, induction_var, induction_value, temp_map, temp_counter):
     def fresh_temp():
         temp_counter[0] += 1
@@ -820,6 +861,7 @@ def _clone_instruction_for_unroll(instr, induction_var, induction_value, temp_ma
     return TACInstruction(instr.op, new_arg1, new_arg2, new_result)
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def _body_is_safe_to_unroll(body, induction_var):
     """
     Unrolling conservador:
@@ -841,6 +883,7 @@ def _body_is_safe_to_unroll(body, induction_var):
     return True
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def loop_unrolling(instructions, max_unroll=8):
     """
     Loop unrolling para for-loops simples.
@@ -989,10 +1032,8 @@ def loop_unrolling(instructions, max_unroll=8):
             # El cuerpo empieza después del IF_FALSE.
             body_start = i + 4
 
-            # El cuerpo termina antes del update.
             body_end = update_index
 
-            # Si justo antes del update hay un label for_update, no forma parte del cuerpo.
             if (
                 body_end - 1 >= body_start
                 and instructions[body_end - 1].op == "LABEL"
@@ -1043,6 +1084,7 @@ def loop_unrolling(instructions, max_unroll=8):
     return optimized
 
 
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def optimize_once(instructions):
     instructions = constant_and_copy_propagation(instructions)
     instructions = loop_unrolling(instructions, max_unroll=8)
@@ -1055,6 +1097,7 @@ def optimize_once(instructions):
     return instructions
 
 
+# Ejecuta las pasadas de optimización sobre una lista de instrucciones TAC.
 def optimizar_tac(instructions, passes=6):
     optimized = list(instructions)
 
@@ -1071,11 +1114,13 @@ def optimizar_tac(instructions, passes=6):
     return optimized
 
 
+# Imprime el TAC ya optimizado.
 def imprimir_tac_optimizado(instrucciones):
     for i, instr in enumerate(instrucciones):
         print(f"{i:04d}: {instr}")
 
 
+# Guarda el TAC optimizado en disco.
 def guardar_tac_optimizado(instrucciones, ruta="tac_optimized.ir"):
     with open(ruta, "w", encoding="utf-8") as archivo:
         for instr in instrucciones:

@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Traducción dirigida por sintaxis y análisis semántico: construye nodos del AST y valida tipos, ámbitos, arreglos, funciones y control de flujo.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from .semantic.ast_nodes import Nodo
 from .semantic.errors import error_semantico
 from .semantic.symbol_table import TablaFunciones, TablaSimbolos
@@ -32,6 +36,7 @@ snapshots_funcion = []
 funcion_pendiente = None
 funcion_contexto_pila = []
 
+# Limpia el estado semántico global antes de analizar un nuevo programa.
 def reset_semantica():
     global ambito_pila, break_contexto, loop_contexto
     global snapshots_funcion, funcion_pendiente, funcion_contexto_pila
@@ -49,19 +54,23 @@ def reset_semantica():
     funcion_contexto_pila = []
 
 
+# Abre un nuevo ámbito para variables declaradas dentro de bloques o funciones.
 def entrar_ambito():
     ambito_pila.append(TablaSimbolos())
 
 
+# Cierra el ámbito actual y vuelve al nivel anterior.
 def salir_ambito():
     if len(ambito_pila) > 1:
         ambito_pila.pop() 
 
 
+# Devuelve la tabla de símbolos activa según el ámbito actual.
 def obtener_tabla_actual():
     return ambito_pila[-1]
 
 
+# Busca una variable desde el ámbito más interno hacia los externos.
 def buscar_variable(nombre):
     for ambito in reversed(ambito_pila):
         if nombre in ambito.simbolos:
@@ -70,6 +79,7 @@ def buscar_variable(nombre):
 
 
 
+# Convierte valores compatibles a una forma numérica para operar con ellos.
 def valor_numerico(valor):
     if es_valor_desconocido(valor):
         return valor
@@ -80,9 +90,11 @@ def valor_numerico(valor):
     return valor
 
 
+# Interpreta valores numéricos o booleanos bajo las reglas del lenguaje.
 def valor_booleano(valor):
     return bool(valor_numerico(valor))
 
+# Determina el tipo resultante de una operación aritmética binaria.
 def tipo_aritmetico(tipo_izq, tipo_der, operador):
     if tipo_izq == "double" or tipo_der == "double":
         return "double"
@@ -91,11 +103,13 @@ def tipo_aritmetico(tipo_izq, tipo_der, operador):
     return "int"
 
 
+# Evalúa una expresión y, opcionalmente, devuelve también su tipo.
 def evaluarexpresion(nodo, con_tipo=False):
     valor, tipo = evaluar_con_tipo(nodo)
     return (valor, tipo) if con_tipo else valor
 
 
+# Evalúa nodos de expresión validando tipos, inicialización y operaciones permitidas.
 def evaluar_con_tipo(nodo):
     if nodo is None:
         error_semantico("invalid expression")
@@ -291,6 +305,7 @@ def evaluar_con_tipo(nodo):
     error_semantico(f"unknown operator '{nodo.tipo}'", nodo=nodo)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _declarar_item(tipo_dato, item):
     if item.tipo == 'DECL_MATRIX_ITEM':
         return _declarar_matriz_item(tipo_dato, item)
@@ -316,6 +331,7 @@ def _declarar_item(tipo_dato, item):
     return Nodo('DECL', nombre_var, hijos, linea=item.linea, columna=item.columna)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _normalizar_lista_sentencias(nodo):
     if nodo is None:
         return []
@@ -324,6 +340,7 @@ def _normalizar_lista_sentencias(nodo):
     return [nodo]
 
 
+# Convierte un literal string con escapes a su valor semántico interno.
 def parsear_string_literal(val, posiciones=None, indice=0):
     if not (isinstance(val, str) and len(val) >= 2 and val[0] == '"' and val[-1] == '"'):
         error_semantico(f"expected string literal, got '{val}'", posiciones, indice)
@@ -345,6 +362,7 @@ def parsear_string_literal(val, posiciones=None, indice=0):
     return ValorString(contenido)
 
 
+# Convierte textos del lexer a constantes Python equivalentes.
 def parsear_constante(val, posiciones=None, indice=0):
     if isinstance(val, (int, float, bool)):
         return val
@@ -371,12 +389,14 @@ def parsear_constante(val, posiciones=None, indice=0):
     error_semantico(f"invalid constant '{val}'", posiciones, indice)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _pos(posiciones, indice):
     if posiciones and len(posiciones) > indice:
         return posiciones[indice]
     return (None, None)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _nodo_binario(operador, elementos, posiciones=None):
     linea, columna = _pos(posiciones, 1)
     return Nodo(
@@ -388,6 +408,7 @@ def _nodo_binario(operador, elementos, posiciones=None):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _nodo_unario(operador, elementos, posiciones=None):
     linea, columna = _pos(posiciones, 0)
     return Nodo(
@@ -399,6 +420,7 @@ def _nodo_unario(operador, elementos, posiciones=None):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _validar_condicion(condicion):
     """
     Valida semánticamente la condición del if.
@@ -418,6 +440,7 @@ def _validar_condicion(condicion):
     return valor, tipo
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _crear_asignacion(nombre_var, expr_nodo, posiciones=None, aplicar=True):
     valor = evaluarexpresion(expr_nodo)
 
@@ -441,6 +464,7 @@ def _crear_asignacion(nombre_var, expr_nodo, posiciones=None, aplicar=True):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _crear_incdec(nombre_var, operador, posiciones=None, aplicar=False):
     ambito, var_info = buscar_variable(nombre_var)
 
@@ -484,6 +508,7 @@ def _crear_incdec(nombre_var, operador, posiciones=None, aplicar=False):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _validar_switch(expr_switch, cases, default_item=None, posiciones=None):
     valor_switch, tipo_switch = evaluarexpresion(expr_switch, con_tipo=True)
 
@@ -517,38 +542,45 @@ def _validar_switch(expr_switch, cases, default_item=None, posiciones=None):
         valores_vistos.add(valor_convertido)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def entrar_break_contexto():
     global break_contexto
     break_contexto += 1
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def salir_break_contexto():
     global break_contexto
     if break_contexto > 0:
         break_contexto -= 1
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_break(posiciones=None):
     if break_contexto <= 0:
         error_semantico("'break' statement not within loop or switch", posiciones, 0)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def entrar_loop_contexto():
     global loop_contexto
     loop_contexto += 1
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def salir_loop_contexto():
     global loop_contexto
     if loop_contexto > 0:
         loop_contexto -= 1
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_continue(posiciones=None):
     if loop_contexto <= 0:
         error_semantico("'continue' statement not within loop", posiciones, 0)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _snapshot_ambitos():
     return [
         {nombre: datos.copy() for nombre, datos in ambito.simbolos.items()}
@@ -556,6 +588,7 @@ def _snapshot_ambitos():
     ]
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def entrar_funcion_contexto():
     global funcion_pendiente
 
@@ -568,6 +601,7 @@ def entrar_funcion_contexto():
         funcion_contexto_pila.append(None)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def salir_funcion_contexto():
     if funcion_contexto_pila:
         funcion_contexto_pila.pop()
@@ -584,12 +618,14 @@ def salir_funcion_contexto():
         }
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def obtener_funcion_actual():
     if not funcion_contexto_pila:
         return None
     return funcion_contexto_pila[-1]
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_return(expr_nodo=None, posiciones=None):
     funcion_actual = obtener_funcion_actual()
 
@@ -630,6 +666,7 @@ def validar_return(expr_nodo=None, posiciones=None):
     return expr_nodo
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def declarar_parametros_funcion_actual(posiciones=None):
     funcion_actual = obtener_funcion_actual()
 
@@ -651,10 +688,12 @@ def declarar_parametros_funcion_actual(posiciones=None):
         )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_print_expr(expr_nodo):
     evaluarexpresion(expr_nodo, con_tipo=True)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_printf_formato(formato_nodo):
     valor, tipo = evaluarexpresion(formato_nodo, con_tipo=True)
 
@@ -667,6 +706,7 @@ def validar_printf_formato(formato_nodo):
     return valor.valor
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_printf_args(formato_nodo, argumentos):
     formato = validar_printf_formato(formato_nodo)
     especificadores = extraer_formatos_printf(formato, formato_nodo)
@@ -687,6 +727,7 @@ def validar_printf_args(formato_nodo, argumentos):
             )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def extraer_formatos_printf(formato, nodo=None):
     especificadores = []
     permitidos = {"d", "i", "u", "f", "c", "s", "b"}
@@ -719,6 +760,7 @@ def extraer_formatos_printf(formato, nodo=None):
     return especificadores
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def tipo_compatible_printf(especificador, tipo):
     if especificador in {"d", "i"}:
         return tipo in ENTEROS | {"char", "bool"}
@@ -741,6 +783,7 @@ def tipo_compatible_printf(especificador, tipo):
     return False
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_funcion_retorno(header):
     if header is None:
         return
@@ -759,6 +802,7 @@ def validar_funcion_retorno(header):
         )
 
 
+# Evalúa operandos o expresiones internas durante la ejecución de la VM.
 def _evaluar_indice_array(indice_nodo):
     valor_indice, tipo_indice = evaluarexpresion(indice_nodo, con_tipo=True)
 
@@ -779,6 +823,7 @@ def _evaluar_indice_array(indice_nodo):
     return valor_indice
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _declarar_array_item(tipo_dato, item):
     nombre_var = item.valor
     tamano_nodo = item.hijos[0]
@@ -842,6 +887,7 @@ def _declarar_array_item(tipo_dato, item):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _declarar_matriz_item(tipo_dato, item):
     nombre_var = item.valor
     filas_nodo = item.hijos[0]
@@ -925,6 +971,7 @@ def _declarar_matriz_item(tipo_dato, item):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _crear_array_access(nombre_var, indice_nodo, posiciones=None):
     linea, columna = _pos(posiciones, 0)
 
@@ -937,6 +984,7 @@ def _crear_array_access(nombre_var, indice_nodo, posiciones=None):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _crear_matrix_access(nombre_var, fila_nodo, columna_nodo, posiciones=None):
     linea, columna = _pos(posiciones, 0)
 
@@ -949,6 +997,7 @@ def _crear_matrix_access(nombre_var, fila_nodo, columna_nodo, posiciones=None):
     )
 
 
+# Evalúa operandos o expresiones internas durante la ejecución de la VM.
 def _evaluar_array_access(nodo):
     nombre_var = nodo.valor
     indice_nodo = nodo.hijos[0]
@@ -963,6 +1012,7 @@ def _evaluar_array_access(nodo):
     return ambito.obtener_array(nombre_var, indice_valor, nodo=nodo)
 
 
+# Evalúa operandos o expresiones internas durante la ejecución de la VM.
 def _evaluar_matrix_access(nodo):
     nombre_var = nodo.valor
     fila_nodo = nodo.hijos[0]
@@ -979,6 +1029,7 @@ def _evaluar_matrix_access(nodo):
     return ambito.obtener_matriz(nombre_var, fila_valor, columna_valor, nodo=nodo)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _asignar_array_access(array_nodo, expr_nodo, posiciones=None):
     nombre_var = array_nodo.valor
     indice_nodo = array_nodo.hijos[0]
@@ -1010,6 +1061,7 @@ def _asignar_array_access(array_nodo, expr_nodo, posiciones=None):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _asignar_matrix_access(matrix_nodo, expr_nodo, posiciones=None):
     nombre_var = matrix_nodo.valor
     fila_nodo = matrix_nodo.hijos[0]
@@ -1044,6 +1096,7 @@ def _asignar_matrix_access(matrix_nodo, expr_nodo, posiciones=None):
     )
 
 
+# Selecciona la acción asociada a cada producción reducida por el parser.
 def accion_semantica(produccion, elementos, posiciones=None):
     global funcion_pendiente
     
@@ -1876,6 +1929,7 @@ def accion_semantica(produccion, elementos, posiciones=None):
     )
 
 
+# Muestra el AST de forma jerárquica para depuración o salida verbose.
 def imprimir_arbol(nodo, nivel=0):
     if nodo is None:
         return
@@ -1885,6 +1939,7 @@ def imprimir_arbol(nodo, nivel=0):
         imprimir_arbol(hijo, nivel + 1)
 
 
+# Genera una representación DOT del AST para convertirla a SVG o PNG.
 def exportar_arbol_graphviz(nodo, nombre_archivo="ast"):
     if nodo is None:
         print("No AST available.")

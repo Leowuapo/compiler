@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Lexer del compilador: transforma el texto fuente en una lista ordenada de tokens con línea y columna.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 import re
 from .lexertable import token
 
@@ -5,6 +9,7 @@ from .lexertable import token
 compiled_tokens = [(re.compile(pattern), token_type) for pattern, token_type in token]
 
 
+# Recorre el código fuente línea por línea y produce tokens con su posición exacta.
 def tokenize(code):
     lista_tokens = []
 
@@ -40,6 +45,7 @@ def tokenize(code):
     return lista_tokens
 
 
+# Lee archivos fuente usando UTF-8 y un respaldo compatible con archivos antiguos.
 def _read_source_file(ruta):
     """Read source code consistently across Windows, Linux and macOS.
 
@@ -54,6 +60,7 @@ def _read_source_file(ruta):
             return archivo.read()
 
 
+# Carga un archivo y lo envía al tokenizer.
 def analizearchive(ruta):
     try:
         code = _read_source_file(ruta)
@@ -68,5 +75,6 @@ def analizearchive(ruta):
         return None
 
 
+# Tokeniza código recibido directamente como cadena.
 def analizeterminal(code):
     return tokenize(code)

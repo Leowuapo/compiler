@@ -1,6 +1,11 @@
+# PENTA Compiler - documentación interna
+# Generación de TAC: recorre el AST y produce instrucciones intermedias independientes de la máquina virtual.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from dataclasses import dataclass
 
 
+# Representa una instrucción de tres direcciones con operación, operandos y destino.
 @dataclass
 class TACInstruction:
     op: str
@@ -8,6 +13,7 @@ class TACInstruction:
     arg2: object = None
     result: object = None
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def __str__(self):
         if self.op == "LABEL":
             return f"{self.result}:"
@@ -92,7 +98,9 @@ class TACInstruction:
         
 
 
+# Recorre el AST y emite instrucciones TAC en el mismo orden lógico del programa.
 class TACGenerator:
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def __init__(self):
         self.instructions = []
         self.temp_count = 0
@@ -100,23 +108,28 @@ class TACGenerator:
         self.break_stack = []
         self.continue_stack = []
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def new_temp(self):
         self.temp_count += 1
         return f"t{self.temp_count}"
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def new_label(self, prefix="L"):
         self.label_count += 1
         return f"{prefix}{self.label_count}"
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def emit(self, op, arg1=None, arg2=None, result=None):
         instr = TACInstruction(op, arg1, arg2, result)
         self.instructions.append(instr)
         return instr
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def generate(self, ast):
         self.visit(ast)
         return self.instructions
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def visit(self, nodo):
         if nodo is None:
             return None
@@ -137,6 +150,7 @@ class TACGenerator:
         metodo = getattr(self, f"visit_{nodo.tipo}", self.visit_default)
         return metodo(nodo)
 
+    # Atiende nodos AST de tipo default durante la generación de TAC.
     def visit_default(self, nodo):
         for hijo in getattr(nodo, "hijos", []):
             self.visit(hijo)
@@ -146,10 +160,12 @@ class TACGenerator:
     # Programa / funciones
     # -------------------------
 
+    # Atiende nodos AST de tipo PROGRAM durante la generación de TAC.
     def visit_PROGRAM(self, nodo):
         for hijo in nodo.hijos:
             self.visit(hijo)
 
+    # Atiende nodos AST de tipo FUNCTION durante la generación de TAC.
     def visit_FUNCTION(self, nodo):
         nombre = nodo.valor
         self.emit("FUNC", result=nombre)
@@ -172,10 +188,12 @@ class TACGenerator:
 
         self.emit("END_FUNC", result=nombre)
 
+    # Atiende nodos AST de tipo BLOCK durante la generación de TAC.
     def visit_BLOCK(self, nodo):
         for stmt in nodo.hijos:
             self.visit(stmt)
 
+    # Atiende nodos AST de tipo STMT_LIST durante la generación de TAC.
     def visit_STMT_LIST(self, nodo):
         for stmt in nodo.hijos:
             self.visit(stmt)
@@ -184,10 +202,12 @@ class TACGenerator:
     # Declaraciones / asignación
     # -------------------------
 
+    # Atiende nodos AST de tipo DECL_LIST durante la generación de TAC.
     def visit_DECL_LIST(self, nodo):
         for decl in nodo.hijos:
             self.visit(decl)
 
+    # Atiende nodos AST de tipo DECL durante la generación de TAC.
     def visit_DECL(self, nodo):
         nombre = nodo.valor
 
@@ -197,6 +217,7 @@ class TACGenerator:
             valor = self.gen_expr(nodo.hijos[1])
             self.emit("ASSIGN", arg1=valor, result=nombre)
 
+    # Atiende nodos AST de tipo DECL_ARRAY durante la generación de TAC.
     def visit_DECL_ARRAY(self, nodo):
         nombre = nodo.valor
 
@@ -207,6 +228,7 @@ class TACGenerator:
                 valor = self.gen_expr(expr)
                 self.emit("STORE_ARRAY", arg1=valor, result=(nombre, indice))
 
+    # Atiende nodos AST de tipo DECL_MATRIX durante la generación de TAC.
     def visit_DECL_MATRIX(self, nodo):
         nombre = nodo.valor
 
@@ -222,25 +244,30 @@ class TACGenerator:
 
         return None
 
+    # Atiende nodos AST de tipo ASSIGN durante la generación de TAC.
     def visit_ASSIGN(self, nodo):
         valor = self.gen_expr(nodo.hijos[0])
         self.emit("ASSIGN", arg1=valor, result=nodo.valor)
 
+    # Atiende nodos AST de tipo INC durante la generación de TAC.
     def visit_INC(self, nodo):
         nombre = nodo.valor
         self.emit("+", arg1=nombre, arg2=1, result=nombre)
 
 
+    # Atiende nodos AST de tipo DEC durante la generación de TAC.
     def visit_DEC(self, nodo):
         nombre = nodo.valor
         self.emit("-", arg1=nombre, arg2=1, result=nombre)
 
+    # Atiende nodos AST de tipo ASSIGN_ARRAY durante la generación de TAC.
     def visit_ASSIGN_ARRAY(self, nodo):
         nombre = nodo.valor
         indice = self.gen_expr(nodo.hijos[0])
         valor = self.gen_expr(nodo.hijos[1])
         self.emit("STORE_ARRAY", arg1=valor, result=(nombre, indice))
 
+    # Atiende nodos AST de tipo ASSIGN_MATRIX durante la generación de TAC.
     def visit_ASSIGN_MATRIX(self, nodo):
         nombre = nodo.valor
         fila = self.gen_expr(nodo.hijos[0])
@@ -252,6 +279,7 @@ class TACGenerator:
     # Control flow
     # -------------------------
 
+    # Atiende nodos AST de tipo IF durante la generación de TAC.
     def visit_IF(self, nodo):
         condicion = self.gen_expr(nodo.hijos[0])
         label_end = self.new_label("endif")
@@ -260,6 +288,7 @@ class TACGenerator:
         self.visit(nodo.hijos[1])
         self.emit("LABEL", result=label_end)
 
+    # Atiende nodos AST de tipo IF_ELSE durante la generación de TAC.
     def visit_IF_ELSE(self, nodo):
         condicion = self.gen_expr(nodo.hijos[0])
         label_else = self.new_label("else")
@@ -272,6 +301,7 @@ class TACGenerator:
         self.visit(nodo.hijos[2])
         self.emit("LABEL", result=label_end)
 
+    # Atiende nodos AST de tipo WHILE durante la generación de TAC.
     def visit_WHILE(self, nodo):
         label_start = self.new_label("while")
         label_end = self.new_label("endwhile")
@@ -292,6 +322,7 @@ class TACGenerator:
         self.emit("GOTO", result=label_start)
         self.emit("LABEL", result=label_end)
 
+    # Atiende nodos AST de tipo FOR durante la generación de TAC.
     def visit_FOR(self, nodo):
         init = nodo.hijos[0]
         condicion_nodo = nodo.hijos[1]
@@ -321,6 +352,7 @@ class TACGenerator:
         self.emit("GOTO", result=label_start)
         self.emit("LABEL", result=label_end)
 
+    # Atiende nodos AST de tipo SWITCH durante la generación de TAC.
     def visit_SWITCH(self, nodo):
         expr_switch = self.gen_expr(nodo.hijos[0])
 
@@ -365,11 +397,13 @@ class TACGenerator:
 
         self.emit("LABEL", result=label_end)
 
+    # Atiende nodos AST de tipo BREAK durante la generación de TAC.
     def visit_BREAK(self, nodo):
         if not self.break_stack:
             raise Exception("TAC error: break outside loop/switch")
         self.emit("GOTO", result=self.break_stack[-1])
 
+    # Atiende nodos AST de tipo CONTINUE durante la generación de TAC.
     def visit_CONTINUE(self, nodo):
         if not self.continue_stack:
             raise Exception("TAC error: continue outside loop")
@@ -379,6 +413,7 @@ class TACGenerator:
     # Funciones / llamadas / return
     # -------------------------
 
+    # Atiende nodos AST de tipo RETURN durante la generación de TAC.
     def visit_RETURN(self, nodo):
         if nodo.hijos:
             valor = self.gen_expr(nodo.hijos[0])
@@ -386,6 +421,7 @@ class TACGenerator:
         else:
             self.emit("RETURN")
 
+    # Atiende nodos AST de tipo CALL durante la generación de TAC.
     def visit_CALL(self, nodo):
         # llamada como statement
         for arg in nodo.hijos:
@@ -398,10 +434,12 @@ class TACGenerator:
     # Print / printf
     # -------------------------
 
+    # Atiende nodos AST de tipo PRINT durante la generación de TAC.
     def visit_PRINT(self, nodo):
         valor = self.gen_expr(nodo.hijos[0])
         self.emit("PRINT", result=valor)
 
+    # Atiende nodos AST de tipo PRINTF durante la generación de TAC.
     def visit_PRINTF(self, nodo):
         formato = self.gen_expr(nodo.hijos[0])
         args = [self.gen_expr(arg) for arg in nodo.hijos[1:]]
@@ -411,6 +449,7 @@ class TACGenerator:
     # Expresiones
     # -------------------------
 
+    # Genera una representación intermedia para expresiones o llamadas según el nodo recibido.
     def gen_expr(self, nodo):
         if nodo is None:
             return None
@@ -458,6 +497,7 @@ class TACGenerator:
 
         raise Exception(f"TAC error: expression node not supported: {nodo.tipo}")
 
+    # Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
     def format_const(self, valor):
         # ValorString de sdt.py tiene atributo .valor
         if hasattr(valor, "valor"):
@@ -472,16 +512,19 @@ class TACGenerator:
         return valor
 
 
+# Genera TAC a partir del AST recibido por el backend.
 def generar_tac(ast):
     generator = TACGenerator()
     return generator.generate(ast)
 
 
+# Imprime las instrucciones TAC en formato legible.
 def imprimir_tac(instrucciones):
     for i, instr in enumerate(instrucciones):
         print(f"{i:04d}: {instr}")
 
 
+# Escribe el TAC en un archivo de salida.
 def guardar_tac(instrucciones, ruta="tac.ir"):
     with open(ruta, "w", encoding="utf-8") as archivo:
         for instr in instrucciones:
