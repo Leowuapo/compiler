@@ -10,173 +10,17 @@ import re
 from contextlib import redirect_stdout
 from io import StringIO
 
+from .pipeline.artifacts import (
+    build_artifact_paths as _build_artifact_paths,
+    run_name_from_source as _run_name_from_source,
+    slugify as _slugify,
+)
+from .pipeline.reporting import imprimir_resumen_ejecucion
+from .pipeline.token_mapper import mapear_tokens
+
 ultimo_ast = None
 ultimo_resultado = None
 
-def _slugify(value):
-    value = str(value or "run")
-    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value)
-    value = value.strip("._-")
-    return value or "run"
-
-
-def _run_name_from_source(source_path=None, output_dir=None):
-    if source_path and source_path not in {"<terminal>", "<editor>", "<unknown>"}:
-        base = os.path.splitext(os.path.basename(source_path))[0]
-    elif output_dir:
-        base = os.path.basename(os.path.abspath(output_dir))
-    else:
-        base = "run"
-    return _slugify(base)
-
-
-def _build_artifact_paths(output_dir=None, ast_base_path="ast", source_path=None):
-    run_name = _run_name_from_source(source_path, output_dir)
-
-    if output_dir is None:
-        base_dir = os.path.dirname(os.path.abspath(ast_base_path)) or "."
-    else:
-        base_dir = output_dir
-
-    ast_dir = os.path.join(base_dir, "ast")
-    ir_dir = os.path.join(base_dir, "ir")
-    target_dir = os.path.join(base_dir, "target")
-
-    for folder in (base_dir, ast_dir, ir_dir, target_dir):
-        os.makedirs(folder, exist_ok=True)
-
-    ast_base = os.path.join(ast_dir, f"ast_{run_name}")
-
-    return {
-        "ast_dot": f"{ast_base}.dot",
-        "ast_png": f"{ast_base}.png",
-        "ast_svg": f"{ast_base}.svg",
-        "ast_modern_dot": f"{ast_base}.dot",
-        "ast_modern_svg": f"{ast_base}.svg",
-        "tac": os.path.join(ir_dir, f"tac_{run_name}.ir"),
-        "tac_optimized": os.path.join(ir_dir, f"tac_optimized_{run_name}.ir"),
-        "target_code": os.path.join(target_dir, f"target_code_{run_name}.asm"),
-        "base_dir": base_dir,
-        "ast_dir": ast_dir,
-        "ir_dir": ir_dir,
-        "target_dir": target_dir,
-    }
-
-
-def mapear_tokens(tokens):
-    simbolos = []
-    lexemas = []
-    posiciones = []
-    
-    valid_types = {
-        'int', 'float', 'double', 'char',
-        'void', 'bool', 'long', 'short', 'unsigned'
-    }
-
-    for tipo, valor, linea, columna in tokens:
-        if tipo == 'keyword' and valor in valid_types:
-            simbolos.append('TYPE')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'keyword' and valor == 'main':
-            simbolos.append('ID')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-        
-        elif tipo == 'keyword' and valor in {
-            'if', 'else', 'while', 'for',
-            'switch', 'case', 'default',
-            'break', 'continue', 'return',
-            'print', 'printf'
-        }:
-            simbolos.append(valor)
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'identifier' and valor in {'true', 'false'}:
-            simbolos.append('CONST')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'identifier':
-            simbolos.append('ID')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'constant':
-            simbolos.append('CONST')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-        
-        elif tipo == 'literal':
-            simbolos.append('CONST')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'operator' and valor in {
-            '=', '+', '-', '*', '/', '%',
-            '&&', '||', '!',
-            '==', '!=', '<', '>', '<=', '>=',
-            '++', '--'
-        }:
-            simbolos.append(valor)
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == ',':
-            simbolos.append(',')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == ';':
-            simbolos.append(';')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == '(':
-            simbolos.append('(')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == ')':
-            simbolos.append(')')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == '{':
-            simbolos.append('{')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == '}':
-            simbolos.append('}')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == '[':
-            simbolos.append('[')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == ']':
-            simbolos.append(']')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-        
-        elif tipo == 'punctuation' and valor == ':':
-            simbolos.append(':')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        else:
-            raise Exception(f"Unexpected token: {tipo} {valor}")
-        
-    simbolos.append('$')
-    lexemas.append('$')
-
-    posiciones.append((None, None))
-    return simbolos, lexemas, posiciones
 
 def analizar(tokens, ast_base_path="ast", output_dir=None, verbose=True, source_path=None):
     global ultimo_ast, ultimo_resultado
@@ -395,53 +239,6 @@ def analizar(tokens, ast_base_path="ast", output_dir=None, verbose=True, source_
             return False
 
 
-def imprimir_resumen_ejecucion(resultado):
-    """Imprime una salida compacta para ejecuciones normales."""
-    source_path = resultado.get("source_path") or "<unknown>"
-    output_dir = resultado.get("output_dir") or "."
-    artifacts = resultado.get("artifacts") or {}
-    vm_resultado = resultado.get("vm_resultado")
-    vm_executed = resultado.get("vm_executed", False)
-
-    print("Compiler run")
-    print("============")
-    print(f"Input: {source_path}")
-    print("Status: OK")
-    print()
-
-    print("Phases:")
-    print("[OK] Lexer")
-    print("[OK] Parser")
-    print("[OK] Semantic analysis")
-    print("[OK] AST generated")
-    print("[OK] TAC generated")
-    print("[OK] Optimized TAC generated")
-    print("[OK] Target code generated")
-    print("[OK] VM execution" if vm_executed else "[SKIP] VM execution: main function not found")
-    print()
-
-    print(f"Artifacts directory: {output_dir}")
-    for folder_label in ("ast_dir", "ir_dir", "target_dir"):
-        path = artifacts.get(folder_label)
-        if path:
-            print(f"- {folder_label}: {path}")
-
-    for label in ("ast_dot", "ast_svg", "ast_png", "tac", "tac_optimized", "target_code"):
-        path = artifacts.get(label)
-        if path:
-            print(f"- {path}")
-
-    if vm_executed and vm_resultado is not None:
-        print()
-        print("VM Output:")
-        output = vm_resultado.get("output") or []
-        if output:
-            for line in output:
-                print(line)
-        else:
-            print("(no output)")
-        print()
-        print(f"VM Return Value: {vm_resultado.get('return_value')}")
 
 def obtener_ultimo_resultado():
     """Devuelve el resultado detallado de la última ejecución del parser.
