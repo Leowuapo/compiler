@@ -73,25 +73,130 @@ class CompilerGUI:
     - pestañas para TAC, TAC optimizado y código objetivo.
     """
 
-    THEME = {
-        'bg': '#0f172a',
-        'panel': '#111827',
-        'panel_2': '#0b1220',
-        'panel_3': '#1e293b',
-        'border': '#334155',
-        'text': '#e5e7eb',
-        'muted': '#94a3b8',
-        'accent': '#38bdf8',
-        'accent_2': '#2563eb',
-        'success': '#22c55e',
-        'warning': '#f59e0b',
-        'error': '#ef4444',
-        'purple': '#a78bfa',
-        'orange': '#fb923c',
-        'green': '#86efac',
-        'ast_edge': '#46637f',
-        'ast_outline': '#7dd3fc',
+    THEMES = {
+        "dark": {
+            'name': 'Dark',
+            'appearance': 'dark',
+            'bg': '#0f172a',
+            'panel': '#111827',
+            'panel_2': '#0b1220',
+            'panel_3': '#1e293b',
+            'border': '#334155',
+            'text': '#e5e7eb',
+            'muted': '#94a3b8',
+            'accent': '#38bdf8',
+            'accent_2': '#2563eb',
+            'accent_hover': '#1d4ed8',
+            'button_hover': '#334155',
+            'danger': '#7f1d1d',
+            'danger_hover': '#991b1b',
+            'vm_bg': '#020617',
+            'success': '#22c55e',
+            'warning': '#f59e0b',
+            'error': '#ef4444',
+            'purple': '#a78bfa',
+            'orange': '#fb923c',
+            'green': '#86efac',
+            'type': '#60a5fa',
+            'operator': '#f472b6',
+            'punctuation': '#cbd5e1',
+            'comment': '#64748b',
+            'ast_edge': '#46637f',
+            'ast_outline': '#7dd3fc',
+            'ast_palette': {
+                'program': '#0f2742', 'function': '#0e3a5b',
+                'declaration': '#164e63', 'control': '#075985',
+                'operator': '#1d4ed8', 'leaf': '#1e3a5f', 'default': '#1e293b'
+            },
+            'tag_function': '#93c5fd', 'tag_label': '#facc15',
+            'tag_jump': '#fb923c', 'tag_call': '#c084fc',
+            'tag_return': '#86efac', 'tag_memory': '#fde68a',
+            'tag_arithmetic': '#60a5fa', 'tag_logic': '#38bdf8',
+            'tag_assign': '#e5e7eb', 'tag_io': '#67e8f9',
+        },
+        "light": {
+            'name': 'Light',
+            'appearance': 'light',
+            'bg': '#f8fafc',
+            'panel': '#ffffff',
+            'panel_2': '#f1f5f9',
+            'panel_3': '#e2e8f0',
+            'border': '#cbd5e1',
+            'text': '#0f172a',
+            'muted': '#475569',
+            'accent': '#0284c7',
+            'accent_2': '#2563eb',
+            'accent_hover': '#1d4ed8',
+            'button_hover': '#cbd5e1',
+            'danger': '#dc2626',
+            'danger_hover': '#b91c1c',
+            'vm_bg': '#ffffff',
+            'success': '#16a34a',
+            'warning': '#d97706',
+            'error': '#dc2626',
+            'purple': '#7c3aed',
+            'orange': '#ea580c',
+            'green': '#15803d',
+            'type': '#2563eb',
+            'operator': '#be185d',
+            'punctuation': '#334155',
+            'comment': '#64748b',
+            'ast_edge': '#64748b',
+            'ast_outline': '#0284c7',
+            'ast_palette': {
+                'program': '#dbeafe', 'function': '#bae6fd',
+                'declaration': '#ccfbf1', 'control': '#bfdbfe',
+                'operator': '#c7d2fe', 'leaf': '#e0f2fe', 'default': '#f1f5f9'
+            },
+            'tag_function': '#1d4ed8', 'tag_label': '#b45309',
+            'tag_jump': '#c2410c', 'tag_call': '#7c3aed',
+            'tag_return': '#15803d', 'tag_memory': '#92400e',
+            'tag_arithmetic': '#2563eb', 'tag_logic': '#0891b2',
+            'tag_assign': '#0f172a', 'tag_io': '#0e7490',
+        },
+        "neutral": {
+            'name': 'Neutral',
+            'appearance': 'dark',
+            'bg': '#18181b',
+            'panel': '#27272a',
+            'panel_2': '#1f1f23',
+            'panel_3': '#3f3f46',
+            'border': '#52525b',
+            'text': '#e4e4e7',
+            'muted': '#a1a1aa',
+            'accent': '#d4d4d8',
+            'accent_2': '#71717a',
+            'accent_hover': '#52525b',
+            'button_hover': '#52525b',
+            'danger': '#7f1d1d',
+            'danger_hover': '#991b1b',
+            'vm_bg': '#111113',
+            'success': '#22c55e',
+            'warning': '#eab308',
+            'error': '#ef4444',
+            'purple': '#c4b5fd',
+            'orange': '#fdba74',
+            'green': '#86efac',
+            'type': '#a5b4fc',
+            'operator': '#f0abfc',
+            'punctuation': '#d4d4d8',
+            'comment': '#71717a',
+            'ast_edge': '#71717a',
+            'ast_outline': '#d4d4d8',
+            'ast_palette': {
+                'program': '#27272a', 'function': '#3f3f46',
+                'declaration': '#52525b', 'control': '#3f3f46',
+                'operator': '#71717a', 'leaf': '#27272a', 'default': '#1f1f23'
+            },
+            'tag_function': '#d4d4d8', 'tag_label': '#eab308',
+            'tag_jump': '#fdba74', 'tag_call': '#c4b5fd',
+            'tag_return': '#86efac', 'tag_memory': '#fef08a',
+            'tag_arithmetic': '#a5b4fc', 'tag_logic': '#67e8f9',
+            'tag_assign': '#e4e4e7', 'tag_io': '#a7f3d0',
+        },
     }
+
+    THEME = THEMES["dark"]
 
     SAMPLE_CODE = """int main() {
     float y = (2 + 3) * 4;
@@ -112,6 +217,11 @@ class CompilerGUI:
         self.root.minsize(1180, 720)
         self.code_font_family = self._select_code_font()
         self.ui_font_family = "Segoe UI"
+        self.theme_name = "dark"
+        self.THEME = dict(self.THEMES[self.theme_name])
+        self.stage_states = {"lexico": "idle", "sintactico": "idle", "semantico": "idle"}
+        self.status_text = "Ready"
+        self.status_type = "success"
 
         self.editor_font_size = 12
         self.output_font_size = 11
@@ -130,7 +240,7 @@ class CompilerGUI:
         self.current_artifacts = {}
         self._set_output_dir(os.path.join(self.outputs_root, "gui_run"))
 
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode(self.THEME.get("appearance", "dark"))
         ctk.set_default_color_theme("blue")
 
         self._configure_ttk_style()
@@ -146,6 +256,7 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     # Layout
     # ---------------------------------------------------------------------
+
     def _load_team_logo(self, max_size=(96, 96)):
         if not PILLOW_AVAILABLE:
             return None
@@ -160,7 +271,7 @@ class CompilerGUI:
             return self.team_logo_photo
         except Exception:
             return None
-    
+
 
     def _select_code_font(self):
         preferred_fonts = [
@@ -352,26 +463,37 @@ class CompilerGUI:
         result_header = ctk.CTkFrame(right, fg_color="transparent")
         result_header.grid(row=0, column=0, sticky="ew", padx=16, pady=(16, 4))
         result_header.grid_columnconfigure(0, weight=1)
+        result_header.grid_columnconfigure(1, weight=0)
+        result_header.grid_columnconfigure(2, weight=0)
+        result_header.grid_columnconfigure(3, weight=0)
+
         ctk.CTkLabel(
             result_header,
             text="Results of compilation",
             font=("Segoe UI", 17, "bold"),
             text_color=self.THEME['text'],
         ).grid(row=0, column=0, sticky="w")
+
+        theme_frame = ctk.CTkFrame(result_header, fg_color="transparent")
+        theme_frame.grid(row=0, column=1, sticky="e", padx=(0, 8))
+        self._theme_button(theme_frame, "Dark", "dark").pack(side="left", padx=2)
+        self._theme_button(theme_frame, "Light", "light").pack(side="left", padx=2)
+        self._theme_button(theme_frame, "Neutral", "neutral").pack(side="left", padx=2)
+
         self.grammar_button = self._secondary_button(
             result_header,
             "Grammar",
             self.show_grammar_window,
         )
-        self.grammar_button.grid(row=0, column=1, sticky="e", padx=(0, 8))
+        self.grammar_button.grid(row=0, column=2, sticky="e", padx=(0, 8))
 
         self.status_label = ctk.CTkLabel(
             result_header,
-            text="Ready",
+            text=self.status_text,
             font=("Segoe UI", 12, "bold"),
             text_color=self.THEME['success'],
         )
-        self.status_label.grid(row=0, column=2, sticky="e")
+        self.status_label.grid(row=0, column=3, sticky="e")
 
         self.tabs = ctk.CTkTabview(right, fg_color=self.THEME['panel_2'], segmented_button_fg_color=self.THEME['panel_3'])
         self.tabs.grid(row=1, column=0, sticky="nsew", padx=16, pady=(4, 16))
@@ -595,16 +717,16 @@ class CompilerGUI:
         tree.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
 
         tag_colors = {
-            "function": "#93c5fd",
-            "label": "#facc15",
-            "jump": "#fb923c",
-            "call": "#c084fc",
-            "return": "#86efac",
-            "memory": "#fde68a",
-            "arithmetic": "#60a5fa",
-            "logic": "#38bdf8",
-            "assign": "#e5e7eb",
-            "io": "#67e8f9",
+            "function": self.THEME.get('tag_function', self.THEME['accent']),
+            "label": self.THEME.get('tag_label', self.THEME['warning']),
+            "jump": self.THEME.get('tag_jump', self.THEME['orange']),
+            "call": self.THEME.get('tag_call', self.THEME['purple']),
+            "return": self.THEME.get('tag_return', self.THEME['green']),
+            "memory": self.THEME.get('tag_memory', self.THEME['warning']),
+            "arithmetic": self.THEME.get('tag_arithmetic', self.THEME['accent']),
+            "logic": self.THEME.get('tag_logic', self.THEME['accent']),
+            "assign": self.THEME.get('tag_assign', self.THEME['text']),
+            "io": self.THEME.get('tag_io', self.THEME['accent']),
             "placeholder": self.THEME['muted'],
             "other": self.THEME['text'],
         }
@@ -645,7 +767,7 @@ class CompilerGUI:
 
         output = ctk.CTkTextbox(
             parent,
-            fg_color="#020617",
+            fg_color=self.THEME.get('vm_bg', self.THEME['panel_2']),
             text_color=self.THEME['text'],
             border_color=self.THEME['border'],
             border_width=1,
@@ -712,24 +834,145 @@ class CompilerGUI:
             width = max(min_width, min(max_width, widest))
             tree.column(column, width=width)
 
+    def _theme_button(self, parent, text, theme_name):
+        is_active = theme_name == self.theme_name
+        fg = self.THEME['accent_2'] if is_active else self.THEME['panel_3']
+        hover = self.THEME.get('accent_hover') if is_active else self.THEME.get('button_hover')
+        return ctk.CTkButton(
+            parent,
+            text=text,
+            command=lambda name=theme_name: self.set_theme(name),
+            width=76,
+            height=30,
+            corner_radius=10,
+            fg_color=fg,
+            hover_color=hover,
+            text_color="#ffffff" if is_active else self.THEME['text'],
+            font=("Segoe UI", 11, "bold"),
+        )
+
+    def set_theme(self, theme_name):
+        if theme_name not in self.THEMES:
+            return
+
+        if theme_name == self.theme_name:
+            return
+
+        state = self._capture_ui_state()
+        self.theme_name = theme_name
+        self.THEME = dict(self.THEMES[self.theme_name])
+        ctk.set_appearance_mode(self.THEME.get('appearance', 'dark'))
+        self._rebuild_interface(state)
+
+    def _capture_ui_state(self):
+        def get_text(widget):
+            try:
+                return widget.get("1.0", "end-1c")
+            except Exception:
+                return ""
+
+        active_tab = None
+        try:
+            active_tab = self.tabs.get()
+        except Exception:
+            pass
+
+        return {
+            "code": get_text(getattr(self, "code_input", None)),
+            "output": get_text(getattr(self, "output_text", None)),
+            "errors": get_text(getattr(self, "error_text", None)),
+            "active_tab": active_tab,
+            "stage_states": dict(getattr(self, "stage_states", {})),
+            "status_text": getattr(self, "status_text", "Ready"),
+            "status_type": getattr(self, "status_type", "success"),
+        }
+
+    def _rebuild_interface(self, state):
+        if self.highlight_after_id is not None:
+            try:
+                self.root.after_cancel(self.highlight_after_id)
+            except Exception:
+                pass
+            self.highlight_after_id = None
+
+        for child in self.root.winfo_children():
+            child.destroy()
+
+        self._configure_ttk_style()
+        self._build_layout()
+        self._configure_text_tags()
+        self._bind_editor_events()
+
+        code = state.get("code") or self.SAMPLE_CODE
+        self.code_input.delete("1.0", tk.END)
+        self.code_input.insert("1.0", code)
+        self.update_line_numbers()
+        self.schedule_highlight()
+
+        self.output_text.delete("1.0", tk.END)
+        if state.get("output"):
+            self.output_text.insert("1.0", state["output"])
+
+        self.error_text.delete("1.0", tk.END)
+        if state.get("errors"):
+            self.error_text.insert("1.0", state["errors"])
+
+        self.set_placeholder_texts()
+        if self.last_tokens:
+            self.load_tokens(self.last_tokens)
+
+        try:
+            self.load_symbol_table()
+            self.load_function_table()
+        except Exception:
+            pass
+
+        resultado = self._get_parser_result()
+        try:
+            self.load_generated_artifacts(resultado)
+            self.load_vm_output(resultado)
+        except Exception:
+            pass
+
+        if self.last_ast is not None:
+            try:
+                self.export_ast_graphviz_modern(self.last_ast)
+                self.load_graphviz_image()
+            except Exception:
+                pass
+
+        self.stage_states = state.get("stage_states") or {"lexico": "idle", "sintactico": "idle", "semantico": "idle"}
+        for stage, status in self.stage_states.items():
+            if stage in self.stage_cards:
+                self.set_stage(stage, status)
+
+        self.update_status(state.get("status_text", "Ready"), state.get("status_type", "success"))
+
+        active_tab = state.get("active_tab")
+        if active_tab:
+            try:
+                self.tabs.set(active_tab)
+            except Exception:
+                pass
+
     def _primary_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
-                             fg_color=self.THEME['accent_2'], hover_color="#1d4ed8",
+                             fg_color=self.THEME['accent_2'], hover_color=self.THEME.get('accent_hover'),
                              font=("Segoe UI", 12, "bold"))
 
     def _secondary_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
-                             fg_color=self.THEME['panel_3'], hover_color="#334155",
+                             fg_color=self.THEME['panel_3'], hover_color=self.THEME.get('button_hover'),
                              font=("Segoe UI", 12, "bold"))
 
     def _danger_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
-                             fg_color="#7f1d1d", hover_color="#991b1b",
+                             fg_color=self.THEME.get('danger'), hover_color=self.THEME.get('danger_hover'),
                              font=("Segoe UI", 12, "bold"))
 
     def _small_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, width=72, height=30, corner_radius=10,
-                             fg_color=self.THEME['panel_3'], hover_color="#334155",
+                             fg_color=self.THEME['panel_3'], hover_color=self.THEME.get('button_hover'),
                              font=("Segoe UI", 11, "bold"))
 
     # ---------------------------------------------------------------------
@@ -738,12 +981,12 @@ class CompilerGUI:
     def _configure_text_tags(self):
         tag_styles = {
             "keyword": {"foreground": self.THEME['purple']},
-            "type": {"foreground": "#60a5fa"},
+            "type": {"foreground": self.THEME.get('type', self.THEME['accent'])},
             "constant": {"foreground": self.THEME['orange']},
             "literal": {"foreground": self.THEME['green']},
-            "operator": {"foreground": "#f472b6"},
-            "punctuation": {"foreground": "#cbd5e1"},
-            "comment": {"foreground": "#64748b", "font": (self.code_font_family, self.editor_font_size, "italic")},
+            "operator": {"foreground": self.THEME.get('operator', self.THEME['purple'])},
+            "punctuation": {"foreground": self.THEME.get('punctuation', self.THEME['text'])},
+            "comment": {"foreground": self.THEME.get('comment', self.THEME['muted']), "font": (self.code_font_family, self.editor_font_size, "italic")},
             "error": {"foreground": self.THEME['error'], "underline": True},
         }
         for tag, opts in tag_styles.items():
@@ -1008,7 +1251,7 @@ class CompilerGUI:
         self.vm_output_text.delete("1.0", tk.END)
 
         if not vm_executed:
-            message = "VM Output: ejecución omitida · main no encontrado"
+            message = "VM Output: skipped · main not found"
             self._set_vm_summary(self.vm_summary_label, message, self.THEME['warning'])
             self.vm_output_text.insert(tk.END, "VM Execution\n", "accent")
             self.vm_output_text.insert(tk.END, "============\n\n", "muted")
@@ -1018,7 +1261,7 @@ class CompilerGUI:
             return
 
         if vm_resultado is None:
-            message = "VM Output: no hay resultado disponible"
+            message = "VM Output: no result available"
             self._set_vm_summary(self.vm_summary_label, message, self.THEME['warning'])
             self.vm_output_text.insert(tk.END, "VM Execution\n", "accent")
             self.vm_output_text.insert(tk.END, "============\n\n", "muted")
@@ -1093,8 +1336,8 @@ class CompilerGUI:
                 rows.append(row)
 
         if not rows:
-            self._set_instruction_summary(summary_label, f"{title}: archivo vacío", self.THEME['warning'])
-            self._insert_instruction_placeholder(tree, "Archivo vacío.")
+            self._set_instruction_summary(summary_label, f"{title}: empty file", self.THEME['warning'])
+            self._insert_instruction_placeholder(tree, "Empty file.")
             return []
 
         for row in rows:
@@ -1479,9 +1722,9 @@ class CompilerGUI:
         self.reset_stage_cards()
         code = self.get_code().strip()
         if not code:
-            self.append_output("[ERROR] No hay código para compilar.\n")
-            self.append_error("No hay código para compilar.")
-            self.update_status("Sin código", "error")
+            self.append_output("[ERROR] No code to compile.\n")
+            self.append_error("No code to compile.")
+            self.update_status("No code", "error")
             return
 
         source_label = self.current_file_path or "<editor>"
@@ -1503,22 +1746,22 @@ class CompilerGUI:
 
         if tokens is None:
             self.set_stage("lexico", "error")
-            self.append_output("[ERROR] Falló el análisis léxico.\n")
-            self.append_error(lexer_messages or "Error léxico: símbolo no reconocido.")
-            self.update_status("Error léxico", "error")
+            self.append_output("[ERROR] Lexical analysis failed.\n")
+            self.append_error(lexer_messages or "Lexical error: unrecognized symbol.")
+            self.update_status("Lexical error", "error")
             self.tabs.set("Errors")
             return
 
         self.last_tokens = tokens
         self.set_stage("lexico", "success")
-        self.append_output(f"[OK] Análisis léxico correcto. Tokens generados: {len(tokens)}\n")
+        self.append_output(f"[OK] Lexical analysis OK. Tokens generated: {len(tokens)}\n")
         self.load_tokens(tokens)
         self.highlight_syntax()
 
         if mode == "lexer":
             self.set_stage("sintactico", "pending")
             self.set_stage("semantico", "pending")
-            self.update_status("Léxico correcto", "success")
+            self.update_status("Lexical analysis OK", "success")
             self.tabs.set("Tokens")
             return
 
@@ -1551,7 +1794,7 @@ class CompilerGUI:
         if result:
             self.set_stage("sintactico", "success")
             self.set_stage("semantico", "success")
-            self.update_status("Compilación correcta", "success")
+            self.update_status("Compilation successful", "success")
             self.load_symbol_table()
             self.load_function_table()
             self.last_ast = getattr(parser, "ultimo_ast", None)
@@ -1571,15 +1814,15 @@ class CompilerGUI:
             if "Syntax error" in parser_output:
                 self.set_stage("sintactico", "error")
                 self.set_stage("semantico", "pending")
-                self.update_status("Error sintáctico", "error")
+                self.update_status("Syntax error", "error")
             elif "SDT error" in parser_output or "Semantic error" in parser_output:
                 self.set_stage("sintactico", "success")
                 self.set_stage("semantico", "error")
-                self.update_status("Error semántico", "error")
+                self.update_status("Semantic error", "error")
             else:
                 self.set_stage("sintactico", "error")
                 self.set_stage("semantico", "error")
-                self.update_status("Compilación fallida", "error")
+                self.update_status("Compilation failed", "error")
             self.tabs.set("Errors")
 
     def extract_ast_text(self, output):
@@ -1603,7 +1846,7 @@ class CompilerGUI:
         if error_lines:
             self.error_text.insert("1.0", "\n".join(error_lines))
         else:
-            self.error_text.insert("1.0", "Sin errores detectados en la última ejecución.")
+            self.error_text.insert("1.0", "No errors detected in the last run.")
 
     # ---------------------------------------------------------------------
     # Tables
@@ -1616,7 +1859,7 @@ class CompilerGUI:
     def load_symbol_table(self):
         self._clear_tree(self.symbol_tree)
         if not tabla_simbolos.simbolos:
-            self.symbol_tree.insert("", tk.END, values=("(vacía)", "-", "-", "-"))
+            self.symbol_tree.insert("", tk.END, values=("(empty)", "-", "-", "-"))
             return
         for name, data in tabla_simbolos.simbolos.items():
             es_array = data.get('es_array', False)
@@ -1631,11 +1874,11 @@ class CompilerGUI:
     def load_function_table(self):
         self._clear_tree(self.function_tree)
         if not tabla_funciones.funciones:
-            self.function_tree.insert("", tk.END, values=("(vacía)", "-", "-"))
+            self.function_tree.insert("", tk.END, values=("(empty)", "-", "-"))
             return
         for name, data in tabla_funciones.funciones.items():
             params = ", ".join(f"{p.get('tipo')} {p.get('nombre')}" for p in data.get('parametros', []))
-            self.function_tree.insert("", tk.END, values=(name, data.get('tipo_retorno', '-'), params or "sin parámetros"))
+            self.function_tree.insert("", tk.END, values=(name, data.get('tipo_retorno', '-'), params or "no parameters"))
 
     def load_parse_table(self):
         if not hasattr(self, "parse_table_text"):
@@ -1679,7 +1922,7 @@ class CompilerGUI:
                 add_node(item, child)
 
         if ast is None:
-            self.ast_tree.insert("", tk.END, text="Sin AST", values=("-", "-"))
+            self.ast_tree.insert("", tk.END, text="No AST", values=("-", "-"))
             return
         add_node("", ast)
 
@@ -1689,7 +1932,7 @@ class CompilerGUI:
         self._clear_tree(self.ast_tree)
         content = self.ast_text.get("1.0", "end-1c")
         if not content.strip():
-            self.ast_tree.insert("", tk.END, text="Sin AST", values=("-", "-"))
+            self.ast_tree.insert("", tk.END, text="No AST", values=("-", "-"))
             return
         stack = []
         for raw_line in content.splitlines():
@@ -1711,7 +1954,7 @@ class CompilerGUI:
         self.ast_canvas.delete("all")
 
         if ast is None:
-            self.draw_ast_placeholder("Sin AST disponible.")
+            self.draw_ast_placeholder("No AST available.")
             return
 
         scale = self.ast_scale
@@ -1845,7 +2088,7 @@ class CompilerGUI:
                 x,
                 y,
                 text=label,
-                fill="#f8fafc",
+                fill=self.THEME['text'],
                 font=("Menlo", font_size, "bold"),
                 justify="center",
             )
@@ -1948,12 +2191,13 @@ class CompilerGUI:
 
     def _ast_color(self, node_type):
         node_type = str(node_type).upper()
+        palette = self.THEME.get('ast_palette', {})
 
         if node_type in {"PROGRAM", "STMT_LIST", "BLOCK"}:
-            return "#0f2742"
+            return palette.get('program', self.THEME['panel_3'])
 
         if node_type in {"FUNCTION", "FUNCTION_DECL", "FUNCTION_HEADER", "CALL"}:
-            return "#0e3a5b"
+            return palette.get('function', self.THEME['panel_3'])
 
         if node_type in {
             "DECL",
@@ -1966,7 +2210,7 @@ class CompilerGUI:
             "PARAM_LIST",
             "RETURN_TYPE",
         }:
-            return "#164e63"
+            return palette.get('declaration', self.THEME['panel_3'])
 
         if node_type in {
             "ASSIGN",
@@ -1985,7 +2229,7 @@ class CompilerGUI:
             "BREAK",
             "CONTINUE",
         }:
-            return "#075985"
+            return palette.get('control', self.THEME['panel_3'])
 
         if node_type in {
             "+",
@@ -2005,12 +2249,12 @@ class CompilerGUI:
             "POS",
             "!",
         }:
-            return "#1d4ed8"
+            return palette.get('operator', self.THEME['accent_2'])
 
         if node_type in {"CONST", "ID", "ARRAY_ACCESS"}:
-            return "#1e3a5f"
+            return palette.get('leaf', self.THEME['panel_2'])
 
-        return "#1e293b"
+        return palette.get('default', self.THEME['panel_2'])
 
     def _round_rect(self, canvas, x1, y1, x2, y2, radius=12, **kwargs):
         points = [
@@ -2032,7 +2276,7 @@ class CompilerGUI:
             return
 
         if not GRAPHVIZ_AVAILABLE:
-            self.append_output("\n[WARN] Graphviz no está disponible. Instala con: brew install graphviz\n")
+            self.append_output("\n[WARN] Graphviz is not available. Install it with: brew install graphviz\n")
             return
 
         os.makedirs(self.current_output_dir, exist_ok=True)
@@ -2136,7 +2380,7 @@ class CompilerGUI:
             self._render_graphviz_preview_png()
 
         except Exception as exc:
-            self.append_output(f"\n[WARN] No se pudo generar AST SVG con Graphviz: {exc}\n")
+            self.append_output(f"\n[WARN] Could not generate AST SVG with Graphviz: {exc}\n")
 
 
     def _render_graphviz_preview_png(self):
@@ -2168,7 +2412,7 @@ class CompilerGUI:
                 text=True,
             )
         except Exception as exc:
-            self.append_output(f"\n[WARN] No se pudo renderizar preview PNG del AST: {exc}\n")
+            self.append_output(f"\n[WARN] Could not render AST preview PNG: {exc}\n")
 
 
     def load_graphviz_image(self):
@@ -2182,7 +2426,7 @@ class CompilerGUI:
                 30,
                 anchor="nw",
                 fill=self.THEME['muted'],
-                text="No hay AST Tree disponible.\nCompile code to generate ast_modern.svg."
+                text="No AST Tree available.\nCompile code to generate ast_modern.svg."
             )
             return
 
@@ -2192,7 +2436,7 @@ class CompilerGUI:
                 30,
                 anchor="nw",
                 fill=self.THEME['warning'],
-                text="No se puede previsualizar el SVG dentro de Tkinter.\nInstala Pillow o usa Abrir SVG."
+                text="Cannot preview SVG inside Tkinter.\nInstall Pillow or use Open SVG."
             )
             return
 
@@ -2218,7 +2462,7 @@ class CompilerGUI:
                 30,
                 anchor="nw",
                 fill=self.THEME['error'],
-                text=f"Error cargando AST Graphviz:\n{exc}"
+                text=f"Error loading AST Graphviz:\n{exc}"
             )
 
 
@@ -2242,7 +2486,7 @@ class CompilerGUI:
 
     def fit_graphviz_to_view(self):
         """
-        Ajusta el AST al tamaño visible del canvas.
+        Fits the AST to the visible canvas area.
         Usa una imagen base a escala 1.0 para calcular el factor.
         """
         if self.last_ast is None:
@@ -2277,7 +2521,7 @@ class CompilerGUI:
 
     def open_graphviz_svg(self):
         if not os.path.exists(self.ast_modern_svg_path):
-            messagebox.showinfo("Abrir AST SVG", "Todavía no hay SVG de AST para abrir.")
+            messagebox.showinfo("Open AST SVG", "There is no AST SVG to open yet.")
             return
 
         svg_path = os.path.abspath(self.ast_modern_svg_path)
@@ -2305,9 +2549,9 @@ class CompilerGUI:
                     pass
 
             messagebox.showwarning(
-                "Abrir AST SVG",
-                "No encontré un navegador compatible instalado. "
-                "Se intentará abrir con la aplicación predeterminada."
+                "Open AST SVG",
+                "No compatible browser was found. "
+                "It will try to open with the default application."
             )
 
         webbrowser.open_new_tab(Path(svg_path).resolve().as_uri())
@@ -2315,40 +2559,40 @@ class CompilerGUI:
 
     def export_graphviz_svg(self):
         if not os.path.exists(self.ast_modern_svg_path):
-            messagebox.showinfo("Exportar AST SVG", "Todavía no hay SVG de AST para exportar.")
+            messagebox.showinfo("Export AST SVG", "There is no AST SVG to export yet.")
             return
 
         destination = filedialog.asksaveasfilename(
-            title="Guardar AST como SVG",
+            title="Save AST as SVG",
             defaultextension=".svg",
             filetypes=[
                 ("SVG", "*.svg"),
-                ("Todos los archivos", "*.*"),
+                ("All files", "*.*"),
             ],
         )
 
         if destination:
             shutil.copyfile(self.ast_modern_svg_path, destination)
-            messagebox.showinfo("Exportar AST SVG", f"AST SVG exportado en:\n{destination}")
+            messagebox.showinfo("Export AST SVG", f"AST SVG exported to:\n{destination}")
 
 
     def export_graphviz_image(self):
         if not os.path.exists(self.ast_graphviz_preview_png_path):
-            messagebox.showinfo("Exportar AST PNG", "Todavía no hay imagen de AST para exportar.")
+            messagebox.showinfo("Export AST PNG", "There is no AST image to export yet.")
             return
 
         destination = filedialog.asksaveasfilename(
-            title="Guardar AST como PNG",
+            title="Save AST as PNG",
             defaultextension=".png",
             filetypes=[
                 ("PNG", "*.png"),
-                ("Todos los archivos", "*.*"),
+                ("All files", "*.*"),
             ],
         )
 
         if destination:
             shutil.copyfile(self.ast_graphviz_preview_png_path, destination)
-            messagebox.showinfo("Exportar AST PNG", f"AST PNG exportado en:\n{destination}")
+            messagebox.showinfo("Export AST PNG", f"AST PNG exported to:\n{destination}")
 
     # ---------------------------------------------------------------------
     # Status and output helpers
@@ -2367,10 +2611,13 @@ class CompilerGUI:
             "success": self.THEME['success'],
             "error": self.THEME['error'],
         }
+        self.stage_states[stage] = state
         label = self.stage_cards[stage]
         label.configure(text=f"{icons[state]} {names[stage]}", text_color=colors[state])
 
     def update_status(self, message, status_type="normal"):
+        self.status_text = message
+        self.status_type = status_type
         colors = {"success": self.THEME['success'], "error": self.THEME['error'], "warning": self.THEME['warning'], "normal": self.THEME['muted']}
         self.status_label.configure(text=message, text_color=colors.get(status_type, self.THEME['muted']))
 
@@ -2394,7 +2641,7 @@ class CompilerGUI:
         for tree in [self.tac_tree, self.tac_optimized_tree, self.target_tree]:
             self._clear_tree(tree)
         self.graphviz_canvas.delete("all")
-        self.update_status("Listo", "success")
+        self.update_status("Ready", "success")
         if not keep_code:
             self.code_input.delete("1.0", tk.END)
             self.current_file_path = None
@@ -2442,11 +2689,13 @@ class CompilerGUI:
     # Grammar viewer
     # ---------------------------------------------------------------------
     def show_grammar_window(self):
-        """Exporta la gramática actual como HTML y la abre en navegador."""
+        """Exports the current grammar as HTML and opens it in the browser."""
         try:
             from parser_sdt.parsertable import productions, terminales, no_terminales
+            terminals = terminales
+            no_terminals = no_terminales
         except Exception as exc:
-            messagebox.showerror("Gramática", f"No se pudo cargar la gramática:\n{exc}")
+            messagebox.showerror("Grammar", f"Could not load grammar:\n{exc}")
             return
 
         output_dir = self.current_output_dir or os.path.join(self.outputs_root, "gui_run")
@@ -2463,7 +2712,7 @@ class CompilerGUI:
 
         def symbol_span(symbol):
             symbol = str(symbol)
-            css = "terminal" if symbol in terminales else "nonterminal" if symbol in no_terminales else "symbol"
+            css = "terminal" if symbol in terminals else "nonterminal" if symbol in no_terminals else "symbol"
             return f'<span class="{css}">{html.escape(symbol)}</span>'
 
         def rhs_html(rhs):
@@ -2503,12 +2752,12 @@ class CompilerGUI:
         js = """
         const search=document.querySelector('#search');const cards=[...document.querySelectorAll('.grammar-card')];const rows=[...document.querySelectorAll('tbody tr')];const count=document.querySelector('#visible-count');function applyFilter(){const q=search.value.trim().toLowerCase();let visible=0;cards.forEach(card=>{const cardMatch=card.dataset.search.includes(q);const alts=[...card.querySelectorAll('.alt')];let visibleAlts=0;alts.forEach(alt=>{const ok=!q||cardMatch||alt.dataset.search.includes(q);alt.classList.toggle('hidden',!ok);if(ok)visibleAlts++});const show=visibleAlts>0;card.classList.toggle('hidden',!show);if(show)visible++});rows.forEach(row=>row.classList.toggle('hidden',q&&!row.dataset.search.includes(q)));count.textContent=visible}search.addEventListener('input',applyFilter);applyFilter();
         """
-        doc = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Gramática actual - PENTA Compiler</title><style>{css}</style></head><body><div class="page"><header><h1>Gramática actual</h1><p class="subtitle">Producciones compactas desde <code>parser_sdt/parsertable.py</code>.</p><div class="stats"><div class="stat"><strong>{len(productions)}</strong> producciones</div><div class="stat"><strong>{len(grouped)}</strong> no terminales con reglas</div><div class="stat"><strong>{len(terminales)}</strong> terminales</div><div class="stat"><strong>{len(no_terminales)}</strong> no terminales</div><div class="stat"><strong id="visible-count">{len(grouped)}</strong> grupos visibles</div></div></header><div class="toolbar"><input id="search" type="search" placeholder="Buscar: FunctionDecl, return, E, printf, array..."></div><div class="legend"><span class="pill"><span class="nonterminal">No terminal</span></span><span class="pill"><span class="terminal">Terminal</span></span><span class="pill"><span class="epsilon">ε</span> producción vacía</span></div><main class="grid">{"".join(cards)}</main><details><summary>Ver tabla lineal de producciones</summary><table><thead><tr><th>#</th><th>LHS</th><th></th><th>RHS</th></tr></thead><tbody>{"".join(table_rows)}</tbody></table></details></div><script>{js}</script></body></html>"""
+        doc = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Current grammar - Team 05 Compiler</title><style>{css}</style></head><body><div class="page"><header><h1>Current grammar</h1><p class="subtitle">Compact productions from <code>parser_sdt/parsertable.py</code>.</p><div class="stats"><div class="stat"><strong>{len(productions)}</strong> productions</div><div class="stat"><strong>{len(grouped)}</strong> nonterminals with rules</div><div class="stat"><strong>{len(terminals)}</strong> terminals</div><div class="stat"><strong>{len(no_terminals)}</strong> no terminals</div><div class="stat"><strong id="visible-count">{len(grouped)}</strong> visible groups</div></div></header><div class="toolbar"><input id="search" type="search" placeholder="Search: FunctionDecl, return, E, printf, array..."></div><div class="legend"><span class="pill"><span class="nonterminal">Nonterminal</span></span><span class="pill"><span class="terminal">Terminal</span></span><span class="pill"><span class="epsilon">ε</span> empty production</span></div><main class="grid">{"".join(cards)}</main><details><summary>Ver tabla lineal de productions</summary><table><thead><tr><th>#</th><th>LHS</th><th></th><th>RHS</th></tr></thead><tbody>{"".join(table_rows)}</tbody></table></details></div><script>{js}</script></body></html>"""
 
         with open(grammar_path, "w", encoding="utf-8") as f:
             f.write(doc)
 
-        self.update_status(f"Grammar exported: {os.path.basename(grammar_path)}", "success")
+        self.update_status(f"Grammar exportada: {os.path.basename(grammar_path)}", "success")
         self._open_path_in_browser(grammar_path)
 
     def _open_path_in_browser(self, path):
@@ -2527,8 +2776,8 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     def open_file(self):
         path = filedialog.askopenfilename(
-            title="Abrir archivo de código",
-            filetypes=[("Código C / texto", "*.c *.h *.txt"), ("Todos los archivos", "*.*")],
+            title="Open source file",
+            filetypes=[("C code / text", "*.c *.h *.txt"), ("All files", "*.*")],
         )
         if not path:
             return
@@ -2547,16 +2796,16 @@ class CompilerGUI:
 
     def save_file(self):
         path = filedialog.asksaveasfilename(
-            title="Guardar código",
+            title="Save code",
             defaultextension=".c",
-            filetypes=[("Código C", "*.c"), ("Texto", "*.txt"), ("Todos los archivos", "*.*")],
+            filetypes=[("C code", "*.c"), ("Text", "*.txt"), ("All files", "*.*")],
         )
         if not path:
             return
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.get_code())
         self.current_file_path = path
-        self.update_status(f"Código guardado: {os.path.basename(path)}", "success")
+        self.update_status(f"Code saved: {os.path.basename(path)}", "success")
 
 
 def main():
