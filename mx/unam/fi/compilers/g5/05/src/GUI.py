@@ -233,12 +233,13 @@ class CompilerGUI:
         self.ast_photo = None
         self.ast_graphviz_photo = None
         self.team_logo_photo = None
-        self.team_logo_path = os.path.join(SRC_ROOT, "assets", "logo.png")
+        self.team_logo_source_path = None
         self.current_file_path = None
         self.outputs_root = os.path.join(SRC_ROOT, "outputs")
         self.current_output_dir = None
         self.current_artifacts = {}
         self._set_output_dir(os.path.join(self.outputs_root, "gui_run"))
+        self._ensure_grammar_viewer(silent=True)
 
         ctk.set_appearance_mode(self.THEME.get("appearance", "dark"))
         ctk.set_default_color_theme("blue")
@@ -257,19 +258,47 @@ class CompilerGUI:
     # Layout
     # ---------------------------------------------------------------------
 
+    def _get_team_logo_path(self):
+        """Return the logo image that matches the active GUI theme.
+
+        Expected optional files under assets/:
+            logo_dark.png
+            logo_light.png
+            logo_neutral.png
+
+        If the themed logo is not available, the GUI falls back to the
+        previous generic assets/logo.png file so older installations keep
+        working without changes.
+        """
+        assets_dir = os.path.join(SRC_ROOT, "assets")
+        candidates = [
+            os.path.join(assets_dir, f"logo_{self.theme_name}.png"),
+            os.path.join(assets_dir, "logo.png"),
+        ]
+
+        for path in candidates:
+            if os.path.exists(path):
+                return path
+
+        return None
+
     def _load_team_logo(self, max_size=(96, 96)):
         if not PILLOW_AVAILABLE:
             return None
 
-        if not os.path.exists(self.team_logo_path):
+        logo_path = self._get_team_logo_path()
+        if not logo_path:
+            self.team_logo_source_path = None
             return None
 
         try:
-            image = Image.open(self.team_logo_path)
+            image = Image.open(logo_path)
             image.thumbnail(max_size)
             self.team_logo_photo = ImageTk.PhotoImage(image)
+            self.team_logo_source_path = logo_path
             return self.team_logo_photo
         except Exception:
+            self.team_logo_source_path = None
             return None
 
 
@@ -577,47 +606,29 @@ class CompilerGUI:
         toolbar = ctk.CTkFrame(tab, fg_color="transparent")
         toolbar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
 
-        self._small_button(toolbar, "SVG −", lambda: self.zoom_graphviz(0.85)).pack(side="left", padx=3)
-        self._small_button(toolbar, "SVG +", lambda: self.zoom_graphviz(1.15)).pack(side="left", padx=3)
-        self._small_button(toolbar, "Fit", self.fit_graphviz_to_view).pack(side="left", padx=3)
-        self._small_button(toolbar, "Reset", self.reset_graphviz_zoom).pack(side="left", padx=3)
+        self._small_button(toolbar, "Open SVG Viewer", self.open_graphviz_svg).pack(side="left", padx=3)
         self._small_button(toolbar, "Export SVG", self.export_graphviz_svg).pack(side="left", padx=3)
-        self._small_button(toolbar, "Open SVG", self.open_graphviz_svg).pack(side="left", padx=3)
+        self._small_button(toolbar, "Export PNG", self.export_graphviz_image).pack(side="left", padx=3)
+        self._small_button(toolbar, "Open AST folder", self.open_ast_folder).pack(side="left", padx=3)
 
-        shell = ctk.CTkFrame(tab, fg_color=self.THEME['panel_2'])
-        shell.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
-        shell.grid_rowconfigure(0, weight=1)
-        shell.grid_columnconfigure(0, weight=1)
-
-        self.graphviz_canvas = tk.Canvas(
-            shell,
-            bg=self.THEME['panel_2'],
-            highlightthickness=0
+        self.ast_info_text = ctk.CTkTextbox(
+            tab,
+            fg_color=self.THEME['panel_2'],
+            text_color=self.THEME['text'],
+            border_color=self.THEME['border'],
+            border_width=1,
+            corner_radius=12,
+            font=(self.code_font_family, self.output_font_size),
+            wrap="word",
         )
-        self.graphviz_canvas.grid(row=0, column=0, sticky="nsew")
-
-        vbar = ctk.CTkScrollbar(shell, orientation="vertical", command=self.graphviz_canvas.yview)
-        hbar = ctk.CTkScrollbar(shell, orientation="horizontal", command=self.graphviz_canvas.xview)
-
-        vbar.grid(row=0, column=1, sticky="ns")
-        hbar.grid(row=1, column=0, sticky="ew")
-
-        self.graphviz_canvas.configure(
-            yscrollcommand=vbar.set,
-            xscrollcommand=hbar.set
+        self.ast_info_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.ast_info_text.insert(
+            "1.0",
+            "Compile code to generate the AST files.\n\n"
+            "This tab no longer embeds a PNG preview. Use Open SVG Viewer to see the complete tree in your browser."
         )
+        self.ast_info_text.configure(state="disabled")
 
-        # Arrastrar imagen con mouse
-        self.graphviz_canvas.bind("<ButtonPress-1>", lambda e: self.graphviz_canvas.scan_mark(e.x, e.y))
-        self.graphviz_canvas.bind("<B1-Motion>", lambda e: self.graphviz_canvas.scan_dragto(e.x, e.y, gain=1))
-
-        self.graphviz_canvas.create_text(
-            30,
-            30,
-            anchor="nw",
-            fill=self.THEME['muted'],
-            text="Compile code to generate the AST Tree."
-        )
 
     def _make_textbox(self, parent):
         box = ctk.CTkTextbox(
@@ -958,26 +969,31 @@ class CompilerGUI:
     def _primary_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
                              fg_color=self.THEME['accent_2'], hover_color=self.THEME.get('accent_hover'),
+                             text_color=self.THEME.get('primary_button_text', '#ffffff'),
                              font=("Segoe UI", 12, "bold"))
+
 
     def _secondary_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
                              fg_color=self.THEME['panel_3'], hover_color=self.THEME.get('button_hover'),
+                             text_color=self.THEME.get('button_text', self.THEME['text']),
                              font=("Segoe UI", 12, "bold"))
+
 
     def _danger_button(self, parent, text, command):
         return ctk.CTkButton(parent, text=text, command=command, height=38, corner_radius=12,
                              fg_color=self.THEME.get('danger'), hover_color=self.THEME.get('danger_hover'),
+                             text_color=self.THEME.get('danger_button_text', '#ffffff'),
                              font=("Segoe UI", 12, "bold"))
 
+
     def _small_button(self, parent, text, command):
-        return ctk.CTkButton(parent, text=text, command=command, width=72, height=30, corner_radius=10,
+        return ctk.CTkButton(parent, text=text, command=command, width=112, height=30, corner_radius=10,
                              fg_color=self.THEME['panel_3'], hover_color=self.THEME.get('button_hover'),
+                             text_color=self.THEME.get('button_text', self.THEME['text']),
                              font=("Segoe UI", 11, "bold"))
 
-    # ---------------------------------------------------------------------
-    # Editor, highlighting and zoom
-    # ---------------------------------------------------------------------
+
     def _configure_text_tags(self):
         tag_styles = {
             "keyword": {"foreground": self.THEME['purple']},
@@ -1142,34 +1158,42 @@ class CompilerGUI:
 
     def _set_output_dir(self, output_dir):
         self.current_output_dir = os.path.abspath(output_dir)
-        self.ast_output_base = os.path.join(self.current_output_dir, "ast")
-        self.ast_png_path = self.ast_output_base + ".png"
+        self.current_run_name = self._safe_run_name(output_dir)
+
+        self.ast_dir = os.path.join(self.current_output_dir, "ast")
+        self.ir_dir = os.path.join(self.current_output_dir, "ir")
+        self.target_dir = os.path.join(self.current_output_dir, "target")
+
+        self.ast_output_base = os.path.join(self.ast_dir, f"ast_{self.current_run_name}")
         self.ast_dot_path = self.ast_output_base + ".dot"
-        self.ast_modern_dot_path = os.path.join(self.current_output_dir, "ast_modern.dot")
-        self.ast_modern_svg_path = os.path.join(self.current_output_dir, "ast_modern.svg")
-        self.ast_graphviz_preview_png_path = os.path.join(
-            self.current_output_dir,
-            ".gui_cache",
-            "ast_modern_preview.png",
-        )
-        self.ast_modern_png_path = self.ast_graphviz_preview_png_path
+        self.ast_png_path = self.ast_output_base + ".png"
+        self.ast_modern_dot_path = self.ast_dot_path
+        self.ast_modern_svg_path = self.ast_output_base + ".svg"
+        self.ast_svg_viewer_path = self.ast_output_base + "_viewer.html"
+        self.ast_graphviz_preview_png_path = self.ast_png_path
+        self.ast_modern_png_path = self.ast_png_path
+
         self.current_artifacts = {
             "ast_dot": self.ast_dot_path,
             "ast_png": self.ast_png_path,
             "ast_modern_dot": self.ast_modern_dot_path,
             "ast_modern_svg": self.ast_modern_svg_path,
-            "tac": os.path.join(self.current_output_dir, "tac.ir"),
-            "tac_optimized": os.path.join(self.current_output_dir, "tac_optimized.ir"),
-            "target_code": os.path.join(self.current_output_dir, "target_code.asm"),
+            "ast_svg_viewer": self.ast_svg_viewer_path,
+            "tac": os.path.join(self.ir_dir, f"tac_{self.current_run_name}.ir"),
+            "tac_optimized": os.path.join(self.ir_dir, f"tac_optimized_{self.current_run_name}.ir"),
+            "target_code": os.path.join(self.target_dir, f"target_code_{self.current_run_name}.asm"),
         }
+
 
     def _prepare_output_dir(self, source_path):
         run_name = self._safe_run_name(source_path)
         output_dir = os.path.join(self.outputs_root, run_name)
         os.makedirs(output_dir, exist_ok=True)
-        os.makedirs(os.path.join(output_dir, ".gui_cache"), exist_ok=True)
         self._set_output_dir(output_dir)
+        for folder in (self.ast_dir, self.ir_dir, self.target_dir):
+            os.makedirs(folder, exist_ok=True)
         return output_dir
+
 
     def _get_parser_result(self):
         getter = getattr(parser, "obtener_ultimo_resultado", None)
@@ -1196,10 +1220,12 @@ class CompilerGUI:
         self.append_output("[OK] Target code generated\n")
         self.append_output("[OK] VM execution\n" if vm_executed else "[SKIP] VM execution: main function not found\n")
         self.append_output("\nArtifacts:\n")
-        self.append_output(f"- {artifacts.get('ast_modern_svg', self.ast_modern_svg_path)}\n")
-        self.append_output(f"- {artifacts.get('tac', self.current_artifacts['tac'])}\n")
-        self.append_output(f"- {artifacts.get('tac_optimized', self.current_artifacts['tac_optimized'])}\n")
-        self.append_output(f"- {artifacts.get('target_code', self.current_artifacts['target_code'])}\n")
+        self.append_output(f"- AST DOT: {artifacts.get('ast_dot', self.ast_dot_path)}\n")
+        self.append_output(f"- AST SVG: {artifacts.get('ast_modern_svg', self.ast_modern_svg_path)}\n")
+        self.append_output(f"- AST PNG: {artifacts.get('ast_png', self.ast_png_path)}\n")
+        self.append_output(f"- TAC: {artifacts.get('tac', self.current_artifacts['tac'])}\n")
+        self.append_output(f"- Optimized TAC: {artifacts.get('tac_optimized', self.current_artifacts['tac_optimized'])}\n")
+        self.append_output(f"- Target Code: {artifacts.get('target_code', self.current_artifacts['target_code'])}\n")
 
         if vm_executed and vm_resultado is not None:
             self.append_output("\nVM Output:\n")
@@ -2269,30 +2295,35 @@ class CompilerGUI:
     # ---------------------------------------------------------------------
     def export_ast_graphviz_modern(self, ast):
         """
-        Genera ast_modern.dot y ast_modern.svg en la carpeta outputs/<run>.
-        Para previsualizar dentro de Tkinter se usa una imagen temporal en .gui_cache.
+        Generates one DOT file and renders both SVG and PNG from that same DOT.
+        The GUI no longer uses the PNG as an embedded preview; it is saved only as an artifact.
         """
         if ast is None:
             return
 
         if not GRAPHVIZ_AVAILABLE:
-            self.append_output("\n[WARN] Graphviz is not available. Install it with: brew install graphviz\n")
+            self.append_output("\n[WARN] Graphviz is not available. Install it with: brew install graphviz / apt install graphviz / choco install graphviz\n")
             return
 
-        os.makedirs(self.current_output_dir, exist_ok=True)
-        os.makedirs(os.path.dirname(self.ast_graphviz_preview_png_path), exist_ok=True)
+        for folder in (self.ast_dir, self.ir_dir, self.target_dir):
+            os.makedirs(folder, exist_ok=True)
 
         counter = [0]
+        bg = "transparent"
+        text = self.THEME.get('text', '#f8fafc')
+        edge = self.THEME.get('ast_edge', '#46637f')
+        outline = self.THEME.get('ast_outline', '#7dd3fc')
 
         lines = [
             "digraph AST {",
             "    graph [",
-            "        bgcolor=\"#0f172a\",",
-            "        pad=\"0.45\",",
-            "        nodesep=\"0.42\",",
-            "        ranksep=\"0.72\",",
+            f"        bgcolor=\"{bg}\",",
+            "        pad=\"0.55\",",
+            "        nodesep=\"0.46\",",
+            "        ranksep=\"0.78\",",
             "        splines=\"line\",",
-            "        outputorder=\"edgesfirst\"",
+            "        outputorder=\"edgesfirst\",",
+            "        margin=\"0.05\"",
             "    ];",
             "",
             "    node [",
@@ -2301,58 +2332,46 @@ class CompilerGUI:
             "        fontname=\"Menlo\",",
             "        fontsize=12,",
             "        margin=\"0.16,0.09\",",
-            "        color=\"#7dd3fc\",",
+            f"        color=\"{outline}\",",
             "        penwidth=1.6,",
-            "        fontcolor=\"#f8fafc\"",
+            f"        fontcolor=\"{text}\"",
             "    ];",
             "",
             "    edge [",
-            "        color=\"#46637f\",",
+            f"        color=\"{edge}\",",
             "        penwidth=1.25,",
             "        arrowsize=0.65",
             "    ];",
             "",
         ]
 
-        def esc(text):
+        def esc(value):
             return (
-                str(text)
+                str(value)
                 .replace("\\", "\\\\")
                 .replace('"', '\\"')
                 .replace("\n", "\\n")
             )
 
-        def short_text(text, limit=28):
-            text = str(text)
-            if len(text) <= limit:
-                return text
-            return text[: limit - 1] + "…"
+        def short_text(value, limit=34):
+            value = str(value)
+            return value if len(value) <= limit else value[: limit - 1] + "…"
 
         def node_label(node):
-            tipo = short_text(getattr(node, "tipo", "NODE"), 26)
+            tipo = short_text(getattr(node, "tipo", "NODE"), 28)
             value = self._node_value(node)
-
             if value not in {None, "", "None"}:
-                value = short_text(value, 30)
-                return f"{tipo}\n'{value}'"
-
+                return f"{tipo}\n'{short_text(value, 34)}'"
             return tipo
 
         def rec(node):
             node_id = f"n{counter[0]}"
             counter[0] += 1
-
-            label = node_label(node)
             fill = self._ast_color(getattr(node, "tipo", ""))
-
-            lines.append(
-                f'    {node_id} [label="{esc(label)}", fillcolor="{fill}"];'
-            )
-
+            lines.append(f'    {node_id} [label="{esc(node_label(node))}", fillcolor="{fill}"];')
             for child in getattr(node, "hijos", []) or []:
                 child_id = rec(child)
                 lines.append(f"    {node_id} -> {child_id};")
-
             return node_id
 
         rec(ast)
@@ -2362,200 +2381,80 @@ class CompilerGUI:
             f.write("\n".join(lines))
 
         try:
-            # SVG vectorial: este es el archivo de máxima calidad.
-            subprocess.run(
-                [
-                    "dot",
-                    "-Tsvg",
-                    self.ast_modern_dot_path,
-                    "-o",
-                    self.ast_modern_svg_path,
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-
-            # PNG para mostrar dentro de Tkinter.
-            self._render_graphviz_preview_png()
-
+            subprocess.run(["dot", "-Tsvg", self.ast_modern_dot_path, "-o", self.ast_modern_svg_path], check=True, capture_output=True, text=True)
+            subprocess.run(["dot", "-Tpng", "-Gdpi=180", self.ast_modern_dot_path, "-o", self.ast_png_path], check=True, capture_output=True, text=True)
+            self._write_ast_svg_viewer()
         except Exception as exc:
-            self.append_output(f"\n[WARN] Could not generate AST SVG with Graphviz: {exc}\n")
-
+            self.append_output(f"\n[WARN] Could not render AST artifacts with Graphviz: {exc}\n")
 
     def _render_graphviz_preview_png(self):
-        """
-        Regenera el PNG de vista previa desde el DOT.
-        No escala una imagen vieja; Graphviz vuelve a renderizar con DPI nuevo.
-        """
-        if not GRAPHVIZ_AVAILABLE:
+        """Compatibility wrapper: the PNG is generated from the DOT as a saved artifact."""
+        if not GRAPHVIZ_AVAILABLE or not os.path.exists(self.ast_modern_dot_path):
             return
-
-        if not os.path.exists(self.ast_modern_dot_path):
-            return
-
-        # 120 dpi base se ve nítido. El zoom modifica el DPI.
-        dpi = max(120, min(400, int(220 * self.graphviz_scale)))
-
         try:
             subprocess.run(
-                [
-                    "dot",
-                    "-Tpng",
-                    f"-Gdpi={dpi}",
-                    self.ast_modern_dot_path,
-                    "-o",
-                    self.ast_graphviz_preview_png_path,
-                ],
+                ["dot", "-Tpng", "-Gdpi=180", self.ast_modern_dot_path, "-o", self.ast_png_path],
                 check=True,
                 capture_output=True,
                 text=True,
             )
         except Exception as exc:
-            self.append_output(f"\n[WARN] Could not render AST preview PNG: {exc}\n")
-
+            self.append_output(f"\n[WARN] Could not render AST PNG: {exc}\n")
 
     def load_graphviz_image(self):
-        self.graphviz_canvas.delete("all")
-
-        path = self.ast_graphviz_preview_png_path
-
-        if not os.path.exists(path):
-            self.graphviz_canvas.create_text(
-                30,
-                30,
-                anchor="nw",
-                fill=self.THEME['muted'],
-                text="No AST Tree available.\nCompile code to generate ast_modern.svg."
-            )
+        """Updates the AST tab with links/instructions instead of embedding a PNG preview."""
+        if not hasattr(self, "ast_info_text"):
             return
 
-        if not PILLOW_AVAILABLE:
-            self.graphviz_canvas.create_text(
-                30,
-                30,
-                anchor="nw",
-                fill=self.THEME['warning'],
-                text="Cannot preview SVG inside Tkinter.\nInstall Pillow or use Open SVG."
+        self.ast_info_text.configure(state="normal")
+        self.ast_info_text.delete("1.0", tk.END)
+
+        if not os.path.exists(self.ast_modern_svg_path):
+            self.ast_info_text.insert(
+                "1.0",
+                "No AST Tree available yet.\n\n"
+                "Compile code to generate the AST files. The browser viewer will show the full tree fitted on screen."
             )
+            self.ast_info_text.configure(state="disabled")
             return
 
-        try:
-            image = Image.open(path)
+        files = [
+            ("DOT", self.ast_modern_dot_path),
+            ("SVG", self.ast_modern_svg_path),
+            ("PNG", self.ast_png_path),
+            ("Browser viewer", self.ast_svg_viewer_path),
+        ]
 
-            self.ast_graphviz_photo = ImageTk.PhotoImage(image)
+        self.ast_info_text.insert("1.0", "AST Tree generated successfully.\n\n")
+        self.ast_info_text.insert(tk.END, "Generated files:\n")
+        for label, path in files:
+            status = "OK" if os.path.exists(path) else "missing"
+            self.ast_info_text.insert(tk.END, f"- {label}: {path} [{status}]\n")
 
-            self.graphviz_canvas.create_image(
-                20,
-                20,
-                image=self.ast_graphviz_photo,
-                anchor="nw"
-            )
-
-            self.graphviz_canvas.configure(
-                scrollregion=(0, 0, image.width + 40, image.height + 40)
-            )
-
-        except Exception as exc:
-            self.graphviz_canvas.create_text(
-                30,
-                30,
-                anchor="nw",
-                fill=self.THEME['error'],
-                text=f"Error loading AST Graphviz:\n{exc}"
-            )
-
+        self.ast_info_text.configure(state="disabled")
 
     def zoom_graphviz(self, factor):
-        self.graphviz_scale = max(0.30, min(2.20, self.graphviz_scale * factor))
-
-        if self.last_ast is not None:
-            self._render_graphviz_preview_png()
-
+        # PNG preview zoom was removed; keep method for backward compatibility.
         self.load_graphviz_image()
-
 
     def reset_graphviz_zoom(self):
-        self.graphviz_scale = 1.0
-
-        if self.last_ast is not None:
-            self._render_graphviz_preview_png()
-
+        # PNG preview zoom was removed; keep method for backward compatibility.
         self.load_graphviz_image()
 
-
     def fit_graphviz_to_view(self):
-        """
-        Fits the AST to the visible canvas area.
-        Usa una imagen base a escala 1.0 para calcular el factor.
-        """
-        if self.last_ast is None:
-            return
-
-        old_scale = self.graphviz_scale
-        self.graphviz_scale = 1.0
-        self._render_graphviz_preview_png()
-
-        if not os.path.exists(self.ast_graphviz_preview_png_path) or not PILLOW_AVAILABLE:
-            self.graphviz_scale = old_scale
-            self.load_graphviz_image()
-            return
-
-        try:
-            image = Image.open(self.ast_graphviz_preview_png_path)
-
-            canvas_w = max(300, self.graphviz_canvas.winfo_width() - 60)
-            canvas_h = max(250, self.graphviz_canvas.winfo_height() - 60)
-
-            scale_x = canvas_w / max(1, image.width)
-            scale_y = canvas_h / max(1, image.height)
-
-            self.graphviz_scale = max(0.30, min(2.20, min(scale_x, scale_y)))
-            self._render_graphviz_preview_png()
-            self.load_graphviz_image()
-
-        except Exception:
-            self.graphviz_scale = old_scale
-            self.load_graphviz_image()
-
+        # The browser viewer handles fit-to-screen for the SVG.
+        self.open_graphviz_svg()
 
     def open_graphviz_svg(self):
         if not os.path.exists(self.ast_modern_svg_path):
             messagebox.showinfo("Open AST SVG", "There is no AST SVG to open yet.")
             return
 
-        svg_path = os.path.abspath(self.ast_modern_svg_path)
+        if not os.path.exists(self.ast_svg_viewer_path):
+            self._write_ast_svg_viewer()
 
-        if sys.platform == "darwin":  # macOS
-            browsers = [
-                "Google Chrome",
-                "Safari",
-                "Firefox",
-                "Microsoft Edge",
-                "Brave Browser",
-                "Arc",
-            ]
-
-            for browser in browsers:
-                try:
-                    subprocess.run(
-                        ["open", "-a", browser, svg_path],
-                        check=True,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                    return
-                except Exception:
-                    pass
-
-            messagebox.showwarning(
-                "Open AST SVG",
-                "No compatible browser was found. "
-                "It will try to open with the default application."
-            )
-
-        webbrowser.open_new_tab(Path(svg_path).resolve().as_uri())
-
+        target = self.ast_svg_viewer_path if os.path.exists(self.ast_svg_viewer_path) else self.ast_modern_svg_path
+        self._open_path_in_browser(target)
 
     def export_graphviz_svg(self):
         if not os.path.exists(self.ast_modern_svg_path):
@@ -2564,6 +2463,7 @@ class CompilerGUI:
 
         destination = filedialog.asksaveasfilename(
             title="Save AST as SVG",
+            initialfile=os.path.basename(self.ast_modern_svg_path),
             defaultextension=".svg",
             filetypes=[
                 ("SVG", "*.svg"),
@@ -2575,14 +2475,14 @@ class CompilerGUI:
             shutil.copyfile(self.ast_modern_svg_path, destination)
             messagebox.showinfo("Export AST SVG", f"AST SVG exported to:\n{destination}")
 
-
     def export_graphviz_image(self):
-        if not os.path.exists(self.ast_graphviz_preview_png_path):
-            messagebox.showinfo("Export AST PNG", "There is no AST image to export yet.")
+        if not os.path.exists(self.ast_png_path):
+            messagebox.showinfo("Export AST PNG", "There is no AST PNG to export yet.")
             return
 
         destination = filedialog.asksaveasfilename(
             title="Save AST as PNG",
+            initialfile=os.path.basename(self.ast_png_path),
             defaultextension=".png",
             filetypes=[
                 ("PNG", "*.png"),
@@ -2591,12 +2491,234 @@ class CompilerGUI:
         )
 
         if destination:
-            shutil.copyfile(self.ast_graphviz_preview_png_path, destination)
+            shutil.copyfile(self.ast_png_path, destination)
             messagebox.showinfo("Export AST PNG", f"AST PNG exported to:\n{destination}")
+
+    def _hex_to_rgb_tuple(self, color, fallback="#000000"):
+        """Converts a hex color from the active GUI theme into an RGB tuple for CSS rgba()."""
+        value = str(color or fallback).strip()
+        if value.startswith("#"):
+            value = value[1:]
+        if len(value) == 3:
+            value = "".join(ch * 2 for ch in value)
+        try:
+            if len(value) != 6:
+                raise ValueError
+            return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+        except Exception:
+            fallback_value = str(fallback or "#000000").strip().lstrip("#")
+            if len(fallback_value) == 3:
+                fallback_value = "".join(ch * 2 for ch in fallback_value)
+            try:
+                return tuple(int(fallback_value[i:i + 2], 16) for i in (0, 2, 4))
+            except Exception:
+                return (0, 0, 0)
+
+    def _rgba(self, color, alpha=1.0, fallback="#000000"):
+        r, g, b = self._hex_to_rgb_tuple(color, fallback)
+        return f"rgba({r}, {g}, {b}, {alpha})"
+
+    def _theme_css_variables(self):
+        """Builds CSS variables from the active GUI theme for external HTML viewers."""
+        theme = self.THEME
+        appearance = "light" if theme.get("appearance") == "light" else "dark"
+        bg = theme.get("bg", "#0f172a")
+        panel = theme.get("panel", "#111827")
+        panel_2 = theme.get("panel_2", "#0b1220")
+        panel_3 = theme.get("panel_3", "#1e293b")
+        border = theme.get("border", "#334155")
+        text = theme.get("text", "#e5e7eb")
+        muted = theme.get("muted", "#94a3b8")
+        accent = theme.get("accent", "#38bdf8")
+        accent_2 = theme.get("accent_2", "#2563eb")
+        button_hover = theme.get("button_hover", panel_3)
+        shadow_alpha = "0.12" if appearance == "light" else "0.28"
+
+        values = {
+            "bg": bg,
+            "panel": panel,
+            "panel2": panel_2,
+            "panel3": panel_3,
+            "border": border,
+            "text": text,
+            "muted": muted,
+            "accent": accent,
+            "accent2": accent_2,
+            "button-hover": button_hover,
+            "purple": theme.get("purple", "#a78bfa"),
+            "orange": theme.get("orange", "#fb923c"),
+            "green": theme.get("green", "#86efac"),
+            "yellow": theme.get("tag_memory", theme.get("warning", "#fde68a")),
+            "header-bg": self._rgba(panel, 0.92),
+            "toolbar-bg": self._rgba(panel, 0.94),
+            "toolbar-fade": self._rgba(bg, 0.86),
+            "card-bg": self._rgba(panel, 0.92),
+            "table-head-bg": self._rgba(panel_2, 0.95),
+            "pill-bg": self._rgba(panel_2, 0.84),
+            "border-soft": self._rgba(border, 0.75),
+            "focus-ring": self._rgba(accent, 0.16),
+            "shadow-color": f"rgba(0, 0, 0, {shadow_alpha})",
+        }
+
+        lines = [":root {", f"  color-scheme: {appearance};"]
+        for name, value in values.items():
+            lines.append(f"  --{name}: {value};")
+        lines.append("}")
+        return "\n".join(lines)
+
+    def _write_ast_svg_viewer(self):
+        if not os.path.exists(self.ast_modern_svg_path):
+            return
+
+        try:
+            with open(self.ast_modern_svg_path, "r", encoding="utf-8") as f:
+                svg = f.read()
+        except UnicodeDecodeError:
+            with open(self.ast_modern_svg_path, "r", encoding="latin-1") as f:
+                svg = f.read()
+
+        title = html.escape(os.path.basename(self.ast_modern_svg_path))
+        theme_style = self._theme_css_variables()
+        doc = f"""<!doctype html>
+<html lang=\"es\">
+<head>
+  <meta charset=\"utf-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+  <title>AST Viewer - {title}</title>
+  <style>
+    {theme_style}
+    * {{ box-sizing: border-box; }}
+    body {{ margin:0; background:radial-gradient(circle at top left, var(--panel3) 0, var(--bg) 34rem); color:var(--text); font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; }}
+    .toolbar {{ position:sticky; top:0; z-index:10; display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; padding:.75rem 1rem; background:var(--toolbar-bg); border-bottom:1px solid var(--border-soft); backdrop-filter:blur(10px); }}
+    .toolbar strong {{ color:var(--accent); }}
+    button, a.button {{ border:1px solid var(--border); border-radius:.7rem; padding:.5rem .75rem; color:var(--text); background:var(--panel3); text-decoration:none; font-weight:700; cursor:pointer; }}
+    button:hover, a.button:hover {{ background:var(--button-hover); }}
+    #viewer {{ width:100vw; height:calc(100vh - 58px); overflow:auto; padding:0; }}
+    #canvas {{ position:relative; min-width:100%; min-height:100%; padding:72px; }}
+    #canvas svg {{ display:block; max-width:none; max-height:none; overflow:visible; margin:0 auto; }}
+    .hint {{ color:var(--muted); font-size:.9rem; }}
+  </style>
+</head>
+<body>
+  <div class=\"toolbar\">
+    <strong>AST Viewer</strong>
+    <button type=\"button\" data-action=\"fit\">Fit whole tree</button>
+    <button type=\"button\" data-action=\"width\">Fit width</button>
+    <button type=\"button\" data-action=\"in\">Zoom +</button>
+    <button type=\"button\" data-action=\"out\">Zoom −</button>
+    <button type=\"button\" data-action=\"reset\">Reset</button>
+    <a class=\"button\" href=\"{html.escape(Path(self.ast_modern_svg_path).name)}\" target=\"_blank\" rel=\"noreferrer\">Open raw SVG</a>
+    <span class=\"hint\">Default view fits the whole tree on screen.</span>
+  </div>
+  <main id=\"viewer\"><div id=\"canvas\">{svg}</div></main>
+  <script>
+    const viewer = document.querySelector('#viewer');
+    const canvas = document.querySelector('#canvas');
+    const svg = canvas.querySelector('svg');
+    const PADDING = 144;
+    let zoom = 1;
+
+    function getNaturalSize() {{
+      const vb = svg.viewBox && svg.viewBox.baseVal;
+      if (vb && vb.width > 0 && vb.height > 0) {{
+        return {{ width: vb.width, height: vb.height }};
+      }}
+
+      try {{
+        const box = svg.getBBox();
+        if (box.width > 0 && box.height > 0) {{
+          return {{ width: box.width, height: box.height }};
+        }}
+      }} catch (error) {{
+        // Fall through to a safe default.
+      }}
+
+      return {{ width: 1200, height: 800 }};
+    }}
+
+    const natural = getNaturalSize();
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+    svg.style.transform = 'none';
+
+    function clampScale(value) {{
+      return Math.max(0.05, Math.min(6, value));
+    }}
+
+    function resizeSvg(scale, mode = 'preserve') {{
+        const oldScrollWidth = Math.max(1, viewer.scrollWidth);
+        const oldScrollHeight = Math.max(1, viewer.scrollHeight);
+
+        const currentCenterX = viewer.scrollLeft + viewer.clientWidth / 2;
+        const currentCenterY = viewer.scrollTop + viewer.clientHeight / 2;
+
+        const ratioX = currentCenterX / oldScrollWidth;
+        const ratioY = currentCenterY / oldScrollHeight;
+
+        zoom = clampScale(scale);
+        const width = Math.max(1, natural.width * zoom);
+        const height = Math.max(1, natural.height * zoom);
+
+        svg.style.width = `${{width}}px`;
+        svg.style.height = `${{height}}px`;
+        canvas.style.width = `${{width + PADDING}}px`;
+        canvas.style.height = `${{height + PADDING}}px`;
+
+        requestAnimationFrame(() => {{
+            if (mode === 'center') {{
+            viewer.scrollLeft = Math.max(0, (canvas.scrollWidth - viewer.clientWidth) / 2);
+            viewer.scrollTop = Math.max(0, (canvas.scrollHeight - viewer.clientHeight) / 2);
+            return;
+            }}
+
+            if (mode === 'preserve') {{
+            viewer.scrollLeft = Math.max(
+                0,
+                viewer.scrollWidth * ratioX - viewer.clientWidth / 2
+            );
+            viewer.scrollTop = Math.max(
+                0,
+                viewer.scrollHeight * ratioY - viewer.clientHeight / 2
+            );
+            }}
+        }});
+        }}
+
+        function fitWholeTree() {{
+        const availableWidth = Math.max(100, viewer.clientWidth - PADDING);
+        const availableHeight = Math.max(100, viewer.clientHeight - PADDING);
+        resizeSvg(Math.min(availableWidth / natural.width, availableHeight / natural.height), 'center');
+        }}
+
+        function fitWidth() {{
+        const availableWidth = Math.max(100, viewer.clientWidth - PADDING);
+        resizeSvg(availableWidth / natural.width, 'center');
+        }}
+
+        document.querySelector('[data-action=fit]').addEventListener('click', fitWholeTree);
+        document.querySelector('[data-action=width]').addEventListener('click', fitWidth);
+        document.querySelector('[data-action=in]').addEventListener('click', () => resizeSvg(zoom * 1.2, 'preserve'));
+        document.querySelector('[data-action=out]').addEventListener('click', () => resizeSvg(zoom / 1.2, 'preserve'));
+        document.querySelector('[data-action=reset]').addEventListener('click', fitWholeTree);
+        window.addEventListener('resize', fitWholeTree);
+        fitWholeTree();
+  </script>
+</body>
+</html>"""
+        with open(self.ast_svg_viewer_path, "w", encoding="utf-8") as f:
+            f.write(doc)
+
+    def open_ast_folder(self):
+        path = getattr(self, "ast_dir", None) or self.current_output_dir
+        if not path or not os.path.exists(path):
+            messagebox.showinfo("Open AST folder", "There is no AST folder yet.")
+            return
+        self._open_path_in_browser(path)
 
     # ---------------------------------------------------------------------
     # Status and output helpers
     # ---------------------------------------------------------------------
+
     def reset_stage_cards(self):
         self.set_stage("lexico", "idle")
         self.set_stage("sintactico", "idle")
@@ -2640,7 +2762,15 @@ class CompilerGUI:
         self._clear_tree(self.function_tree)
         for tree in [self.tac_tree, self.tac_optimized_tree, self.target_tree]:
             self._clear_tree(tree)
-        self.graphviz_canvas.delete("all")
+        if hasattr(self, "ast_info_text"):
+            self.ast_info_text.configure(state="normal")
+            self.ast_info_text.delete("1.0", tk.END)
+            self.ast_info_text.insert(
+                "1.0",
+                "Compile code to generate the AST files.\n\n"
+                "This tab no longer embeds a PNG preview. Use Open SVG Viewer to see the complete tree in your browser."
+            )
+            self.ast_info_text.configure(state="disabled")
         self.update_status("Ready", "success")
         if not keep_code:
             self.code_input.delete("1.0", tk.END)
@@ -2675,32 +2805,44 @@ class CompilerGUI:
             self.vm_output_text.insert("1.0", "Compile code to see the explicit output of the VM here.")
             self.vm_output_text.configure(state="disabled")
 
-        if hasattr(self, "graphviz_canvas"):
-            self.graphviz_canvas.delete("all")
-            self.graphviz_canvas.create_text(
-                30,
-                30,
-                anchor="nw",
-                fill=self.THEME['muted'],
-                text="Compile code to generate the AST Tree."
+        if hasattr(self, "ast_info_text"):
+            self.ast_info_text.configure(state="normal")
+            self.ast_info_text.delete("1.0", tk.END)
+            self.ast_info_text.insert(
+                "1.0",
+                "Compile code to generate the AST files.\n\n"
+                "This tab no longer embeds a PNG preview. Use Open SVG Viewer to see the complete tree in your browser."
             )
+            self.ast_info_text.configure(state="disabled")
 
     # ---------------------------------------------------------------------
     # Grammar viewer
     # ---------------------------------------------------------------------
-    def show_grammar_window(self):
-        """Exports the current grammar as HTML and opens it in the browser."""
+    def _ensure_grammar_viewer(self, silent=False):
+        """Generates assets/grammar/index.html once, outside compilation output folders."""
         try:
             from parser_sdt.parsertable import productions, terminales, no_terminales
             terminals = terminales
             no_terminals = no_terminales
         except Exception as exc:
-            messagebox.showerror("Grammar", f"Could not load grammar:\n{exc}")
-            return
+            if not silent:
+                messagebox.showerror("Grammar", f"Could not load grammar:\n{exc}")
+            return None
 
-        output_dir = self.current_output_dir or os.path.join(self.outputs_root, "gui_run")
-        os.makedirs(output_dir, exist_ok=True)
-        grammar_path = os.path.join(output_dir, "grammar.html")
+        grammar_dir = os.path.join(SRC_ROOT, "assets", "grammar")
+        os.makedirs(grammar_dir, exist_ok=True)
+        template_path = os.path.join(grammar_dir, "grammar_template.html")
+        css_path = os.path.join(grammar_dir, "grammar.css")
+        js_path = os.path.join(grammar_dir, "grammar.js")
+
+        missing_assets = [path for path in (template_path, css_path, js_path) if not os.path.exists(path)]
+        if missing_assets:
+            if not silent:
+                messagebox.showerror(
+                    "Grammar",
+                    "Missing grammar viewer asset(s):\n" + "\n".join(missing_assets)
+                )
+            return None
 
         grouped = {}
         for index, production in enumerate(productions):
@@ -2746,18 +2888,35 @@ class CompilerGUI:
                 f'<div class="lhs">{symbol_span(lhs)}</div><div class="alts">{"".join(alt_html)}</div></section>'
             )
 
-        css = """
-        :root{--bg:#0f172a;--panel:#111827;--panel2:#0b1220;--border:#334155;--text:#e5e7eb;--muted:#94a3b8;--accent:#38bdf8;--purple:#a78bfa;--orange:#fb923c;--green:#86efac;--yellow:#fde68a}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top left,#1e293b 0,var(--bg) 34rem);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.page{max-width:1200px;margin:0 auto;padding:32px 24px 48px}header{background:rgba(17,24,39,.92);border:1px solid var(--border);border-radius:22px;padding:24px;box-shadow:0 18px 60px rgba(0,0,0,.28)}h1{margin:0 0 8px;font-size:32px;letter-spacing:-.04em}.subtitle{color:var(--muted);margin:0;font-weight:600}.stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}.stat{background:var(--panel2);border:1px solid var(--border);border-radius:16px;padding:10px 14px}.stat strong{color:var(--accent)}.toolbar{position:sticky;top:0;z-index:10;padding:14px 0;background:linear-gradient(to bottom,var(--bg),rgba(15,23,42,.86));backdrop-filter:blur(8px)}input{width:100%;padding:13px 16px;border:1px solid var(--border);border-radius:14px;background:var(--panel2);color:var(--text);font-size:15px;outline:none}input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.16)}.legend{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 18px;color:var(--muted);font-size:13px}.pill{border:1px solid var(--border);border-radius:999px;padding:5px 10px;background:rgba(11,18,32,.84)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}.grammar-card{display:grid;grid-template-columns:minmax(130px,.7fr) minmax(0,2fr);gap:14px;background:rgba(17,24,39,.92);border:1px solid var(--border);border-radius:18px;padding:16px}.lhs{font:700 15px "JetBrains Mono","SF Mono",Menlo,Consolas,monospace;color:var(--accent);align-self:start}.alts{min-width:0}.alt{display:grid;grid-template-columns:52px 24px minmax(0,1fr);gap:8px;align-items:baseline;padding:3px 0}.prod-num{color:var(--muted);font:600 12px "JetBrains Mono","SF Mono",Menlo,monospace}.arrow{color:var(--orange);font-weight:800}.rhs{font:600 14px "JetBrains Mono","SF Mono",Menlo,Consolas,monospace;overflow-wrap:anywhere}.terminal{color:var(--green)}.nonterminal{color:var(--purple)}.symbol{color:var(--text)}.epsilon{color:var(--yellow);font-weight:800}details{margin-top:22px}summary{cursor:pointer;color:var(--accent);font-weight:800;margin-bottom:10px}table{width:100%;border-collapse:collapse;background:rgba(17,24,39,.92);border-radius:16px;overflow:hidden}th,td{border-bottom:1px solid rgba(51,65,85,.75);padding:9px 12px;text-align:left;vertical-align:top}th{color:var(--muted);background:rgba(11,18,32,.95);position:sticky;top:58px}td{font:600 13px "JetBrains Mono","SF Mono",Menlo,Consolas,monospace}.arrow-cell{color:var(--orange);width:42px;text-align:center}.hidden{display:none!important}@media(max-width:720px){.grammar-card{grid-template-columns:1fr}.page{padding:20px 14px}}
-        """
-        js = """
-        const search=document.querySelector('#search');const cards=[...document.querySelectorAll('.grammar-card')];const rows=[...document.querySelectorAll('tbody tr')];const count=document.querySelector('#visible-count');function applyFilter(){const q=search.value.trim().toLowerCase();let visible=0;cards.forEach(card=>{const cardMatch=card.dataset.search.includes(q);const alts=[...card.querySelectorAll('.alt')];let visibleAlts=0;alts.forEach(alt=>{const ok=!q||cardMatch||alt.dataset.search.includes(q);alt.classList.toggle('hidden',!ok);if(ok)visibleAlts++});const show=visibleAlts>0;card.classList.toggle('hidden',!show);if(show)visible++});rows.forEach(row=>row.classList.toggle('hidden',q&&!row.dataset.search.includes(q)));count.textContent=visible}search.addEventListener('input',applyFilter);applyFilter();
-        """
-        doc = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Current grammar - Team 05 Compiler</title><style>{css}</style></head><body><div class="page"><header><h1>Current grammar</h1><p class="subtitle">Compact productions from <code>parser_sdt/parsertable.py</code>.</p><div class="stats"><div class="stat"><strong>{len(productions)}</strong> productions</div><div class="stat"><strong>{len(grouped)}</strong> nonterminals with rules</div><div class="stat"><strong>{len(terminals)}</strong> terminals</div><div class="stat"><strong>{len(no_terminals)}</strong> no terminals</div><div class="stat"><strong id="visible-count">{len(grouped)}</strong> visible groups</div></div></header><div class="toolbar"><input id="search" type="search" placeholder="Search: FunctionDecl, return, E, printf, array..."></div><div class="legend"><span class="pill"><span class="nonterminal">Nonterminal</span></span><span class="pill"><span class="terminal">Terminal</span></span><span class="pill"><span class="epsilon">ε</span> empty production</span></div><main class="grid">{"".join(cards)}</main><details><summary>Ver tabla lineal de productions</summary><table><thead><tr><th>#</th><th>LHS</th><th></th><th>RHS</th></tr></thead><tbody>{"".join(table_rows)}</tbody></table></details></div><script>{js}</script></body></html>"""
+        with open(template_path, "r", encoding="utf-8") as f:
+            doc = f.read()
 
+        replacements = {
+            "{{PRODUCTION_COUNT}}": str(len(productions)),
+            "{{GROUP_COUNT}}": str(len(grouped)),
+            "{{TERMINAL_COUNT}}": str(len(terminals)),
+            "{{NON_TERMINAL_COUNT}}": str(len(no_terminals)),
+            "{{VISIBLE_COUNT}}": str(len(grouped)),
+            "{{THEME_STYLE}}": self._theme_css_variables(),
+            "{{GRAMMAR_CARDS}}": "".join(cards),
+            "{{GRAMMAR_ROWS}}": "".join(table_rows),
+        }
+        for key, value in replacements.items():
+            doc = doc.replace(key, value)
+
+        grammar_path = os.path.join(grammar_dir, "index.html")
         with open(grammar_path, "w", encoding="utf-8") as f:
             f.write(doc)
 
-        self.update_status(f"Grammar exportada: {os.path.basename(grammar_path)}", "success")
+        self.grammar_html_path = grammar_path
+        return grammar_path
+
+    def show_grammar_window(self):
+        """Opens the grammar viewer generated under assets/grammar instead of outputs/<run>."""
+        grammar_path = self._ensure_grammar_viewer(silent=False)
+        if not grammar_path:
+            return
+        self.update_status("Grammar viewer opened", "success")
         self._open_path_in_browser(grammar_path)
 
     def _open_path_in_browser(self, path):

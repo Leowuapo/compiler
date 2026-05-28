@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Current grammar - PENTA Compiler</title>
+  <link rel="stylesheet" href="grammar.css">
+  <style>
+{{THEME_STYLE}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Current grammar</h1>
+      <p class="subtitle">Compact productions from <code>parser_sdt/parsertable.py</code>.</p>
+      <div class="stats">
+        <div class="stat"><strong>{{PRODUCTION_COUNT}}</strong> productions</div>
+        <div class="stat"><strong>{{GROUP_COUNT}}</strong> nonterminals with rules</div>
+        <div class="stat"><strong>{{TERMINAL_COUNT}}</strong> terminals</div>
+        <div class="stat"><strong>{{NON_TERMINAL_COUNT}}</strong> no terminals</div>
+        <div class="stat"><strong id="visible-count">{{VISIBLE_COUNT}}</strong> visible groups</div>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Search: FunctionDecl, return, E, printf, array...">
+    </div>
+
+    <div class="legend">
+      <span class="pill"><span class="nonterminal">Nonterminal</span></span>
+      <span class="pill"><span class="terminal">Terminal</span></span>
+      <span class="pill"><span class="epsilon">ε</span> empty production</span>
+    </div>
+
+    <main class="grid">{{GRAMMAR_CARDS}}</main>
+
+    <details>
+      <summary>Ver tabla lineal de productions</summary>
+      <table>
+        <thead>
+          <tr><th>#</th><th>LHS</th><th></th><th>RHS</th></tr>
+        </thead>
+        <tbody>{{GRAMMAR_ROWS}}</tbody>
+      </table>
+    </details>
+  </div>
+  <script src="grammar.js"></script>
+</body>
+</html>

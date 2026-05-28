@@ -2396,8 +2396,17 @@ def exportar_arbol_graphviz(nodo, nombre_archivo="ast"):
         print("No AST available.")
         return
 
+    import os
+    import subprocess
+
     dot_path = f"{nombre_archivo}.dot"
     png_path = f"{nombre_archivo}.png"
+    svg_path = f"{nombre_archivo}.svg"
+
+    output_dir = os.path.dirname(os.path.abspath(dot_path))
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     contador = [0]
     lineas = ["digraph AST {", '    node [shape=box, style="rounded"];']
 
@@ -2419,15 +2428,17 @@ def exportar_arbol_graphviz(nodo, nombre_archivo="ast"):
     recorrer(nodo)
     lineas.append("}")
 
-    with open(dot_path, "w") as archivo:
+    with open(dot_path, "w", encoding="utf-8") as archivo:
         archivo.write("\n".join(lineas))
 
     print(f"AST DOT generated: {dot_path}")
 
     try:
-        import subprocess
+        # One DOT can render multiple output formats.
         subprocess.run(["dot", "-Tpng", dot_path, "-o", png_path], check=True)
-        print(f"AST image generated: {png_path}")
+        print(f"AST PNG generated: {png_path}")
+        subprocess.run(["dot", "-Tsvg", dot_path, "-o", svg_path], check=True)
+        print(f"AST SVG generated: {svg_path}")
     except Exception:
         print("Graphviz image could not be generated.")
         print("You can still open the .dot file with a Graphviz viewer.")

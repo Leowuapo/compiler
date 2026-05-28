@@ -6,11 +6,61 @@ from backend.target_code import generar_target_code, imprimir_target_code, guard
 from backend.vm import ejecutar_target_code
 import traceback
 import os
+import re
 from contextlib import redirect_stdout
 from io import StringIO
 
 ultimo_ast = None
 ultimo_resultado = None
+
+def _slugify(value):
+    value = str(value or "run")
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value)
+    value = value.strip("._-")
+    return value or "run"
+
+
+def _run_name_from_source(source_path=None, output_dir=None):
+    if source_path and source_path not in {"<terminal>", "<editor>", "<unknown>"}:
+        base = os.path.splitext(os.path.basename(source_path))[0]
+    elif output_dir:
+        base = os.path.basename(os.path.abspath(output_dir))
+    else:
+        base = "run"
+    return _slugify(base)
+
+
+def _build_artifact_paths(output_dir=None, ast_base_path="ast", source_path=None):
+    run_name = _run_name_from_source(source_path, output_dir)
+
+    if output_dir is None:
+        base_dir = os.path.dirname(os.path.abspath(ast_base_path)) or "."
+    else:
+        base_dir = output_dir
+
+    ast_dir = os.path.join(base_dir, "ast")
+    ir_dir = os.path.join(base_dir, "ir")
+    target_dir = os.path.join(base_dir, "target")
+
+    for folder in (base_dir, ast_dir, ir_dir, target_dir):
+        os.makedirs(folder, exist_ok=True)
+
+    ast_base = os.path.join(ast_dir, f"ast_{run_name}")
+
+    return {
+        "ast_dot": f"{ast_base}.dot",
+        "ast_png": f"{ast_base}.png",
+        "ast_svg": f"{ast_base}.svg",
+        "ast_modern_dot": f"{ast_base}.dot",
+        "ast_modern_svg": f"{ast_base}.svg",
+        "tac": os.path.join(ir_dir, f"tac_{run_name}.ir"),
+        "tac_optimized": os.path.join(ir_dir, f"tac_optimized_{run_name}.ir"),
+        "target_code": os.path.join(target_dir, f"target_code_{run_name}.asm"),
+        "base_dir": base_dir,
+        "ast_dir": ast_dir,
+        "ir_dir": ir_dir,
+        "target_dir": target_dir,
+    }
 
 
 def mapear_tokens(tokens):
@@ -139,17 +189,9 @@ def analizar(tokens, ast_base_path="ast", output_dir=None, verbose=True, source_
     }
     reset_semantica()
 
-    if output_dir is not None:
-        os.makedirs(output_dir, exist_ok=True)
-        ast_base_path = os.path.join(output_dir, "ast")
-
-    artifacts = {
-        "ast_dot": f"{ast_base_path}.dot",
-        "ast_png": f"{ast_base_path}.png",
-        "tac": os.path.join(output_dir, "tac.ir") if output_dir else "tac.ir",
-        "tac_optimized": os.path.join(output_dir, "tac_optimized.ir") if output_dir else "tac_optimized.ir",
-        "target_code": os.path.join(output_dir, "target_code.asm") if output_dir else "target_code.asm",
-    }
+    artifacts = _build_artifact_paths(output_dir, ast_base_path, source_path)
+    ast_base_path = os.path.splitext(artifacts["ast_dot"])[0]
+    output_dir = artifacts["base_dir"]
 
     try:
         entrada, lexemas, posiciones = mapear_tokens(tokens)
@@ -379,7 +421,12 @@ def imprimir_resumen_ejecucion(resultado):
     print()
 
     print(f"Artifacts directory: {output_dir}")
-    for label in ("ast_dot", "ast_png", "tac", "tac_optimized", "target_code"):
+    for folder_label in ("ast_dir", "ir_dir", "target_dir"):
+        path = artifacts.get(folder_label)
+        if path:
+            print(f"- {folder_label}: {path}")
+
+    for label in ("ast_dot", "ast_svg", "ast_png", "tac", "tac_optimized", "target_code"):
         path = artifacts.get(label)
         if path:
             print(f"- {path}")
