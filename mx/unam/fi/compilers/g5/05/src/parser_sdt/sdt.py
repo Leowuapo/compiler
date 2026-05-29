@@ -1,274 +1,27 @@
-class Nodo:
-    def __init__(self, tipo, valor=None, hijos=None, linea=None, columna=None):
-        self.tipo = tipo
-        self.valor = valor
-        self.hijos = hijos if hijos else []
-        self.linea = linea
-        self.columna = columna
-
-    def __repr__(self):
-        return f"Nodo({self.tipo}, {self.valor}, {self.hijos})"
-
-
-class ValorString:
-    def __init__(self, valor):
-        self.valor = valor
-
-    def __repr__(self):
-        return repr(self.valor)
-
-
-def es_string_literal(valor):
-    return isinstance(valor, ValorString)
-
-
-class ValorDesconocido:
-    def __init__(self, tipo, descripcion=None):
-        self.tipo = tipo
-        self.descripcion = descripcion
-
-    def __repr__(self):
-        if self.descripcion:
-            return f"<unknown:{self.tipo}:{self.descripcion}>"
-        return f"<unknown:{self.tipo}>"
-
-
-ENTEROS = {"int", "long", "short", "unsigned"}
-REALES = {"float", "double"}
-VALID_TYPES = ENTEROS | REALES | {"char", "bool", "void"}
-
-RANGOS = {
-    "int": (-2147483648, 2147483647),
-    "short": (-32768, 32767),
-    "unsigned": (0, 4294967295),
-    "long": (-9223372036854775808, 9223372036854775807),
-}
-
-
-def formatear_valor(valor):
-    if es_valor_desconocido(valor):
-        return repr(valor)
-
-    if es_string_literal(valor):
-        return repr(valor.valor)
-
-    return repr(valor) if isinstance(valor, str) else valor
-
-
-def es_valor_desconocido(valor):
-    return isinstance(valor, ValorDesconocido)
-
-
-def error_semantico(mensaje, posiciones=None, indice=0, nodo=None):
-    """Lanza errores semánticos con ubicación cuando está disponible."""
-    if nodo is not None and getattr(nodo, "linea", None) is not None:
-        raise Exception(
-            f"Semantic error at line {nodo.linea}, column {nodo.columna}: {mensaje}"
-        )
-
-    if posiciones and len(posiciones) > indice:
-        linea, columna = posiciones[indice]
-        if linea is not None and columna is not None:
-            raise Exception(f"Semantic error at line {linea}, column {columna}: {mensaje}")
-
-    raise Exception(f"Semantic error: {mensaje}")
-
-
-class TablaSimbolos:
-    def __init__(self):
-        self.simbolos = {}
-
-    def limpiar(self):
-        self.simbolos = {}
-
-    def declarar(self, nombre, tipo, posiciones=None, indice=0):
-        tipo = normalizar_tipo(tipo, posiciones, indice)
-        if tipo == "void":
-            error_semantico(f"variable '{nombre}' cannot be declared as void", posiciones, indice)
-        if nombre in self.simbolos:
-            error_semantico(f"variable '{nombre}' already declared", posiciones, indice)
-        self.simbolos[nombre] = {'tipo': tipo, 'valor': None}
-
-    def asignar(self, nombre, valor, posiciones=None, indice=0):
-        if nombre not in self.simbolos:
-            error_semantico(f"variable '{nombre}' not declared", posiciones, indice)
-        tipo_destino = self.simbolos[nombre]['tipo']
-        self.simbolos[nombre]['valor'] = convertir_a_tipo(
-            valor, tipo_destino, nombre, posiciones, indice
-        )
-
-    def obtener(self, nombre, posiciones=None, indice=0):
-        if nombre not in self.simbolos:
-            error_semantico(f"variable '{nombre}' not declared", posiciones, indice)
-        return self.simbolos[nombre]
-
-    def mostrar(self):
-        for nombre, datos in self.simbolos.items():
-            if datos.get('es_array', False):
-                valores = [formatear_valor(v) for v in datos['valor']]
-                print(
-                    f"{nombre} -> type: {datos['tipo']}[{datos['tamano']}], "
-                    f"value: {valores}"
-                )
-            else:
-                print(
-                    f"{nombre} -> type: {datos['tipo']}, "
-                    f"value: {formatear_valor(datos['valor'])}"
-                )
-
-    def declarar_array(self, nombre, tipo, tamano, posiciones=None, indice=0):
-        tipo = normalizar_tipo(tipo, posiciones, indice)
-
-        if tipo == "void":
-            error_semantico(f"array '{nombre}' cannot be declared as void", posiciones, indice)
-
-        if nombre in self.simbolos:
-            error_semantico(f"variable '{nombre}' already declared", posiciones, indice)
-
-        if not isinstance(tamano, int):
-            error_semantico(f"array size for '{nombre}' must be an integer", posiciones, indice)
-
-        if tamano <= 0:
-            error_semantico(f"array size for '{nombre}' must be greater than zero", posiciones, indice)
-
-        self.simbolos[nombre] = {
-            'tipo': tipo,
-            'valor': [None] * tamano,
-            'es_array': True,
-            'tamano': tamano
-        }
-
-    def asignar_array(self, nombre, indice_array, valor, posiciones=None, indice=0, nodo=None):
-        if nombre not in self.simbolos:
-            error_semantico(f"array '{nombre}' not declared", posiciones, indice, nodo)
-
-        datos = self.simbolos[nombre]
-
-        if not datos.get('es_array', False):
-            error_semantico(f"variable '{nombre}' is not an array", posiciones, indice, nodo)
-
-        if es_valor_desconocido(indice_array):
-            error_semantico(
-                f"array index for '{nombre}' must be known at semantic analysis",
-                posiciones,
-                indice,
-                nodo
-            )
-
-        if not isinstance(indice_array, int):
-            error_semantico(f"array index for '{nombre}' must be an integer", posiciones, indice, nodo)
-
-        if indice_array < 0 or indice_array >= datos['tamano']:
-            error_semantico(
-                f"array index {indice_array} out of bounds for '{nombre}' with size {datos['tamano']}",
-                posiciones,
-                indice,
-                nodo
-            )
-
-        datos['valor'][indice_array] = convertir_a_tipo(
-            valor,
-            datos['tipo'],
-            f"{nombre}[{indice_array}]",
-            posiciones,
-            indice,
-            nodo
-        )
-
-    def obtener_array(self, nombre, indice_array, posiciones=None, indice=0, nodo=None):
-        if nombre not in self.simbolos:
-            error_semantico(f"array '{nombre}' not declared", posiciones, indice, nodo)
-
-        datos = self.simbolos[nombre]
-
-        if not datos.get('es_array', False):
-            error_semantico(f"variable '{nombre}' is not an array", posiciones, indice, nodo)
-
-        if es_valor_desconocido(indice_array):
-            return ValorDesconocido(datos['tipo'], f"{nombre}[unknown]"), datos['tipo']
-
-        if not isinstance(indice_array, int):
-            error_semantico(f"array index for '{nombre}' must be an integer", posiciones, indice, nodo)
-
-        if indice_array < 0 or indice_array >= datos['tamano']:
-            error_semantico(
-                f"array index {indice_array} out of bounds for '{nombre}' with size {datos['tamano']}",
-                posiciones,
-                indice,
-                nodo
-            )
-
-        valor = datos['valor'][indice_array]
-
-        if valor is None:
-            error_semantico(
-                f"array element '{nombre}[{indice_array}]' used before initialization",
-                posiciones,
-                indice,
-                nodo
-            )
-
-        return valor, datos['tipo']
-    
-class TablaFunciones:
-    def __init__(self):
-        self.funciones = {}
-
-    def limpiar(self):
-        self.funciones = {}
-
-    def declarar(self, nombre, tipo_retorno, parametros=None, posiciones=None, indice=0):
-        tipo_retorno = normalizar_tipo(tipo_retorno, posiciones, indice)
-
-        if parametros is None:
-            parametros = []
-
-        if nombre in self.funciones:
-            error_semantico(f"function '{nombre}' already declared", posiciones, indice)
-
-        nombres_param = set()
-
-        for param in parametros:
-            tipo_param = normalizar_tipo(param['tipo'], posiciones, indice)
-
-            if tipo_param == "void":
-                error_semantico(
-                    f"parameter '{param['nombre']}' cannot be void",
-                    posiciones,
-                    indice
-                )
-
-            if param['nombre'] in nombres_param:
-                error_semantico(
-                    f"duplicate parameter '{param['nombre']}' in function '{nombre}'",
-                    posiciones,
-                    indice
-                )
-
-            nombres_param.add(param['nombre'])
-
-        self.funciones[nombre] = {
-            'tipo_retorno': tipo_retorno,
-            'parametros': parametros
-        }
-
-    def obtener(self, nombre, posiciones=None, indice=0):
-        if nombre not in self.funciones:
-            error_semantico(f"function '{nombre}' not declared", posiciones, indice)
-
-        return self.funciones[nombre]
-
-    def mostrar(self):
-        for nombre, datos in self.funciones.items():
-            params = ", ".join(
-                f"{p['tipo']} {p['nombre']}"
-                for p in datos['parametros']
-            )
-
-            print(
-                f"{nombre} -> return type: {datos['tipo_retorno']}, "
-                f"params: ({params})"
-            )
+# PENTA Compiler - documentación interna
+# Traducción dirigida por sintaxis y análisis semántico: construye nodos del AST y valida tipos, ámbitos, arreglos, funciones y control de flujo.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
+from .semantic.ast_nodes import Nodo
+from .semantic.errors import error_semantico
+from .semantic.symbol_table import TablaFunciones, TablaSimbolos
+from .semantic.types import (
+    ENTEROS,
+    REALES,
+    RANGOS,
+    VALID_TYPES,
+    convertir_a_tipo,
+    inferir_tipo_constante,
+    normalizar_tipo,
+    tipos_convertibles,
+)
+from .semantic.values import (
+    ValorDesconocido,
+    ValorString,
+    es_string_literal,
+    es_valor_desconocido,
+    formatear_valor,
+)
 
 
 # Contexto global para semántica
@@ -283,6 +36,7 @@ snapshots_funcion = []
 funcion_pendiente = None
 funcion_contexto_pila = []
 
+# Limpia el estado semántico global antes de analizar un nuevo programa.
 def reset_semantica():
     global ambito_pila, break_contexto, loop_contexto
     global snapshots_funcion, funcion_pendiente, funcion_contexto_pila
@@ -300,19 +54,23 @@ def reset_semantica():
     funcion_contexto_pila = []
 
 
+# Abre un nuevo ámbito para variables declaradas dentro de bloques o funciones.
 def entrar_ambito():
     ambito_pila.append(TablaSimbolos())
 
 
+# Cierra el ámbito actual y vuelve al nivel anterior.
 def salir_ambito():
     if len(ambito_pila) > 1:
         ambito_pila.pop() 
 
 
+# Devuelve la tabla de símbolos activa según el ámbito actual.
 def obtener_tabla_actual():
     return ambito_pila[-1]
 
 
+# Busca una variable desde el ámbito más interno hacia los externos.
 def buscar_variable(nombre):
     for ambito in reversed(ambito_pila):
         if nombre in ambito.simbolos:
@@ -320,31 +78,8 @@ def buscar_variable(nombre):
     return None, None
 
 
-def normalizar_tipo(tipo, posiciones=None, indice=0):
-    if tipo not in VALID_TYPES:
-        error_semantico(f"unknown type '{tipo}'", posiciones, indice)
-    return tipo
 
-
-def inferir_tipo_constante(valor, nodo=None):
-    if es_string_literal(valor):
-        return "string"
-
-    if isinstance(valor, bool):
-        return "bool"
-
-    if isinstance(valor, int):
-        return "int"
-
-    if isinstance(valor, float):
-        return "double"
-
-    if isinstance(valor, str) and len(valor) == 1:
-        return "char"
-
-    error_semantico(f"invalid constant '{valor}'", nodo=nodo)
-
-
+# Convierte valores compatibles a una forma numérica para operar con ellos.
 def valor_numerico(valor):
     if es_valor_desconocido(valor):
         return valor
@@ -355,108 +90,11 @@ def valor_numerico(valor):
     return valor
 
 
+# Interpreta valores numéricos o booleanos bajo las reglas del lenguaje.
 def valor_booleano(valor):
     return bool(valor_numerico(valor))
 
-
-def tipos_convertibles(tipo_origen, tipo_destino):
-    tipo_origen = normalizar_tipo(tipo_origen)
-    tipo_destino = normalizar_tipo(tipo_destino)
-
-    if tipo_destino == "void" or tipo_origen == "void":
-        return tipo_origen == tipo_destino
-
-    if tipo_origen == tipo_destino:
-        return True
-
-    if tipo_destino == "bool":
-        return tipo_origen in ENTEROS | REALES | {"char", "bool"}
-
-    if tipo_destino == "char":
-        return tipo_origen in ENTEROS | {"char", "bool"}
-
-    if tipo_destino in ENTEROS:
-        return tipo_origen in ENTEROS | {"char", "bool"}
-
-    if tipo_destino in REALES:
-        return tipo_origen in ENTEROS | REALES | {"char", "bool"}
-
-    return False
-
-
-def convertir_a_tipo(valor, tipo_destino, nombre_var=None, posiciones=None, indice=0, nodo=None):
-    tipo_destino = normalizar_tipo(tipo_destino, posiciones, indice)
-    etiqueta = f" for variable '{nombre_var}'" if nombre_var else ""
-
-    if es_valor_desconocido(valor):
-        if not tipos_convertibles(valor.tipo, tipo_destino):
-            error_semantico(
-                f"cannot convert value of type '{valor.tipo}' to '{tipo_destino}'{etiqueta}",
-                posiciones,
-                indice,
-                nodo,
-            )
-
-        return ValorDesconocido(tipo_destino, valor.descripcion)
-
-    if tipo_destino == "bool":
-        if isinstance(valor, str) and len(valor) == 1:
-            return ord(valor) != 0
-        return bool(valor)
-
-    if tipo_destino == "char":
-        if isinstance(valor, str) and len(valor) == 1:
-            return valor
-        if isinstance(valor, bool):
-            valor = 1 if valor else 0
-        if isinstance(valor, float):
-            if not valor.is_integer():
-                error_semantico(
-                    f"cannot assign non-integer float to char{etiqueta}",
-                    posiciones,
-                    indice,
-                    nodo,
-                )
-            valor = int(valor)
-        if isinstance(valor, int) and 0 <= valor <= 255:
-            return chr(valor)
-        error_semantico(f"value '{valor}' out of char range{etiqueta}", posiciones, indice, nodo)
-
-    if tipo_destino in ENTEROS:
-        if isinstance(valor, str) and len(valor) == 1:
-            valor = ord(valor)
-        elif isinstance(valor, bool):
-            valor = 1 if valor else 0
-        elif isinstance(valor, float):
-            if not valor.is_integer():
-                error_semantico(
-                    f"cannot assign non-integer value {valor} to {tipo_destino}{etiqueta}",
-                    posiciones,
-                    indice,
-                    nodo,
-                )
-            valor = int(valor)
-
-        if not isinstance(valor, int):
-            error_semantico(f"cannot assign '{valor}' to {tipo_destino}{etiqueta}", posiciones, indice, nodo)
-
-        minimo, maximo = RANGOS[tipo_destino]
-        if not (minimo <= valor <= maximo):
-            error_semantico(f"value {valor} out of range for {tipo_destino}{etiqueta}", posiciones, indice, nodo)
-        return valor
-
-    if tipo_destino in REALES:
-        if isinstance(valor, str) and len(valor) == 1:
-            valor = ord(valor)
-        elif isinstance(valor, bool):
-            valor = 1 if valor else 0
-        if isinstance(valor, (int, float)):
-            return float(valor)
-        error_semantico(f"cannot assign '{valor}' to {tipo_destino}{etiqueta}", posiciones, indice, nodo)
-
-    error_semantico(f"unsupported type '{tipo_destino}'", posiciones, indice, nodo)
-
-
+# Determina el tipo resultante de una operación aritmética binaria.
 def tipo_aritmetico(tipo_izq, tipo_der, operador):
     if tipo_izq == "double" or tipo_der == "double":
         return "double"
@@ -465,11 +103,13 @@ def tipo_aritmetico(tipo_izq, tipo_der, operador):
     return "int"
 
 
+# Evalúa una expresión y, opcionalmente, devuelve también su tipo.
 def evaluarexpresion(nodo, con_tipo=False):
     valor, tipo = evaluar_con_tipo(nodo)
     return (valor, tipo) if con_tipo else valor
 
 
+# Evalúa nodos de expresión validando tipos, inicialización y operaciones permitidas.
 def evaluar_con_tipo(nodo):
     if nodo is None:
         error_semantico("invalid expression")
@@ -496,6 +136,9 @@ def evaluar_con_tipo(nodo):
     
     if nodo.tipo == 'ARRAY_ACCESS':
         return _evaluar_array_access(nodo)
+    
+    if nodo.tipo == 'MATRIX_ACCESS':
+        return _evaluar_matrix_access(nodo)
 
     if nodo.tipo == 'CALL':
         info_funcion = tabla_funciones.obtener(nodo.valor)
@@ -662,7 +305,11 @@ def evaluar_con_tipo(nodo):
     error_semantico(f"unknown operator '{nodo.tipo}'", nodo=nodo)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _declarar_item(tipo_dato, item):
+    if item.tipo == 'DECL_MATRIX_ITEM':
+        return _declarar_matriz_item(tipo_dato, item)
+    
     if item.tipo == 'DECL_ARRAY_ITEM':
         return _declarar_array_item(tipo_dato, item)
     
@@ -684,6 +331,7 @@ def _declarar_item(tipo_dato, item):
     return Nodo('DECL', nombre_var, hijos, linea=item.linea, columna=item.columna)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _normalizar_lista_sentencias(nodo):
     if nodo is None:
         return []
@@ -692,6 +340,7 @@ def _normalizar_lista_sentencias(nodo):
     return [nodo]
 
 
+# Convierte un literal string con escapes a su valor semántico interno.
 def parsear_string_literal(val, posiciones=None, indice=0):
     if not (isinstance(val, str) and len(val) >= 2 and val[0] == '"' and val[-1] == '"'):
         error_semantico(f"expected string literal, got '{val}'", posiciones, indice)
@@ -713,6 +362,7 @@ def parsear_string_literal(val, posiciones=None, indice=0):
     return ValorString(contenido)
 
 
+# Convierte textos del lexer a constantes Python equivalentes.
 def parsear_constante(val, posiciones=None, indice=0):
     if isinstance(val, (int, float, bool)):
         return val
@@ -739,12 +389,14 @@ def parsear_constante(val, posiciones=None, indice=0):
     error_semantico(f"invalid constant '{val}'", posiciones, indice)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _pos(posiciones, indice):
     if posiciones and len(posiciones) > indice:
         return posiciones[indice]
     return (None, None)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _nodo_binario(operador, elementos, posiciones=None):
     linea, columna = _pos(posiciones, 1)
     return Nodo(
@@ -756,6 +408,7 @@ def _nodo_binario(operador, elementos, posiciones=None):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _nodo_unario(operador, elementos, posiciones=None):
     linea, columna = _pos(posiciones, 0)
     return Nodo(
@@ -767,6 +420,7 @@ def _nodo_unario(operador, elementos, posiciones=None):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _validar_condicion(condicion):
     """
     Valida semánticamente la condición del if.
@@ -786,6 +440,7 @@ def _validar_condicion(condicion):
     return valor, tipo
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _crear_asignacion(nombre_var, expr_nodo, posiciones=None, aplicar=True):
     valor = evaluarexpresion(expr_nodo)
 
@@ -809,6 +464,7 @@ def _crear_asignacion(nombre_var, expr_nodo, posiciones=None, aplicar=True):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _crear_incdec(nombre_var, operador, posiciones=None, aplicar=False):
     ambito, var_info = buscar_variable(nombre_var)
 
@@ -852,6 +508,7 @@ def _crear_incdec(nombre_var, operador, posiciones=None, aplicar=False):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _validar_switch(expr_switch, cases, default_item=None, posiciones=None):
     valor_switch, tipo_switch = evaluarexpresion(expr_switch, con_tipo=True)
 
@@ -885,38 +542,45 @@ def _validar_switch(expr_switch, cases, default_item=None, posiciones=None):
         valores_vistos.add(valor_convertido)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def entrar_break_contexto():
     global break_contexto
     break_contexto += 1
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def salir_break_contexto():
     global break_contexto
     if break_contexto > 0:
         break_contexto -= 1
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_break(posiciones=None):
     if break_contexto <= 0:
         error_semantico("'break' statement not within loop or switch", posiciones, 0)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def entrar_loop_contexto():
     global loop_contexto
     loop_contexto += 1
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def salir_loop_contexto():
     global loop_contexto
     if loop_contexto > 0:
         loop_contexto -= 1
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_continue(posiciones=None):
     if loop_contexto <= 0:
         error_semantico("'continue' statement not within loop", posiciones, 0)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _snapshot_ambitos():
     return [
         {nombre: datos.copy() for nombre, datos in ambito.simbolos.items()}
@@ -924,6 +588,7 @@ def _snapshot_ambitos():
     ]
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def entrar_funcion_contexto():
     global funcion_pendiente
 
@@ -936,6 +601,7 @@ def entrar_funcion_contexto():
         funcion_contexto_pila.append(None)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def salir_funcion_contexto():
     if funcion_contexto_pila:
         funcion_contexto_pila.pop()
@@ -952,12 +618,14 @@ def salir_funcion_contexto():
         }
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def obtener_funcion_actual():
     if not funcion_contexto_pila:
         return None
     return funcion_contexto_pila[-1]
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_return(expr_nodo=None, posiciones=None):
     funcion_actual = obtener_funcion_actual()
 
@@ -998,6 +666,7 @@ def validar_return(expr_nodo=None, posiciones=None):
     return expr_nodo
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def declarar_parametros_funcion_actual(posiciones=None):
     funcion_actual = obtener_funcion_actual()
 
@@ -1019,10 +688,12 @@ def declarar_parametros_funcion_actual(posiciones=None):
         )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_print_expr(expr_nodo):
     evaluarexpresion(expr_nodo, con_tipo=True)
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_printf_formato(formato_nodo):
     valor, tipo = evaluarexpresion(formato_nodo, con_tipo=True)
 
@@ -1035,6 +706,7 @@ def validar_printf_formato(formato_nodo):
     return valor.valor
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_printf_args(formato_nodo, argumentos):
     formato = validar_printf_formato(formato_nodo)
     especificadores = extraer_formatos_printf(formato, formato_nodo)
@@ -1055,6 +727,7 @@ def validar_printf_args(formato_nodo, argumentos):
             )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def extraer_formatos_printf(formato, nodo=None):
     especificadores = []
     permitidos = {"d", "i", "u", "f", "c", "s", "b"}
@@ -1087,6 +760,7 @@ def extraer_formatos_printf(formato, nodo=None):
     return especificadores
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def tipo_compatible_printf(especificador, tipo):
     if especificador in {"d", "i"}:
         return tipo in ENTEROS | {"char", "bool"}
@@ -1109,6 +783,7 @@ def tipo_compatible_printf(especificador, tipo):
     return False
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def validar_funcion_retorno(header):
     if header is None:
         return
@@ -1127,6 +802,7 @@ def validar_funcion_retorno(header):
         )
 
 
+# Evalúa operandos o expresiones internas durante la ejecución de la VM.
 def _evaluar_indice_array(indice_nodo):
     valor_indice, tipo_indice = evaluarexpresion(indice_nodo, con_tipo=True)
 
@@ -1147,6 +823,7 @@ def _evaluar_indice_array(indice_nodo):
     return valor_indice
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _declarar_array_item(tipo_dato, item):
     nombre_var = item.valor
     tamano_nodo = item.hijos[0]
@@ -1210,6 +887,91 @@ def _declarar_array_item(tipo_dato, item):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
+def _declarar_matriz_item(tipo_dato, item):
+    nombre_var = item.valor
+    filas_nodo = item.hijos[0]
+    columnas_nodo = item.hijos[1]
+    init_nodo = item.hijos[2] if len(item.hijos) > 2 else None
+
+    filas_valor, filas_tipo = evaluarexpresion(filas_nodo, con_tipo=True)
+    columnas_valor, columnas_tipo = evaluarexpresion(columnas_nodo, con_tipo=True)
+
+    if filas_tipo not in ENTEROS | {"char", "bool"}:
+        error_semantico(
+            f"matrix row size for '{nombre_var}' must be integer-compatible",
+            nodo=filas_nodo
+        )
+
+    if columnas_tipo not in ENTEROS | {"char", "bool"}:
+        error_semantico(
+            f"matrix column size for '{nombre_var}' must be integer-compatible",
+            nodo=columnas_nodo
+        )
+
+    if es_valor_desconocido(filas_valor) or es_valor_desconocido(columnas_valor):
+        error_semantico(
+            f"matrix dimensions for '{nombre_var}' must be known at compile time",
+            nodo=item
+        )
+
+    filas = valor_numerico(filas_valor)
+    columnas = valor_numerico(columnas_valor)
+
+    tabla_actual = obtener_tabla_actual()
+    pos_item = [(item.linea, item.columna)] if item.linea is not None else None
+
+    tabla_actual.declarar_matriz(nombre_var, tipo_dato, filas, columnas, pos_item, 0)
+
+    hijos_ast = [
+        Nodo('TYPE', tipo_dato, linea=item.linea, columna=item.columna),
+        filas_nodo,
+        columnas_nodo
+    ]
+
+    if init_nodo is not None:
+        filas_init = init_nodo.hijos
+
+        if len(filas_init) != filas:
+            error_semantico(
+                f"matrix '{nombre_var}' expects {filas} row initializer(s), got {len(filas_init)}",
+                nodo=init_nodo
+            )
+
+        for indice_fila, fila_nodo in enumerate(filas_init):
+            inicializadores = fila_nodo.hijos
+
+            if len(inicializadores) != columnas:
+                error_semantico(
+                    f"matrix '{nombre_var}' row {indice_fila} expects {columnas} initializer(s), got {len(inicializadores)}",
+                    nodo=fila_nodo
+                )
+
+            for indice_columna, expr_nodo in enumerate(inicializadores):
+                valor = evaluarexpresion(expr_nodo)
+
+                tabla_actual.asignar_matriz(
+                    nombre_var,
+                    indice_fila,
+                    indice_columna,
+                    valor,
+                    pos_item,
+                    0,
+                    nodo=expr_nodo
+                )
+
+        hijos_ast.append(init_nodo)
+
+    return Nodo(
+        'DECL_MATRIX',
+        nombre_var,
+        hijos_ast,
+        linea=item.linea,
+        columna=item.columna
+    )
+
+
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _crear_array_access(nombre_var, indice_nodo, posiciones=None):
     linea, columna = _pos(posiciones, 0)
 
@@ -1222,6 +984,20 @@ def _crear_array_access(nombre_var, indice_nodo, posiciones=None):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
+def _crear_matrix_access(nombre_var, fila_nodo, columna_nodo, posiciones=None):
+    linea, columna = _pos(posiciones, 0)
+
+    return Nodo(
+        'MATRIX_ACCESS',
+        nombre_var,
+        [fila_nodo, columna_nodo],
+        linea=linea,
+        columna=columna
+    )
+
+
+# Evalúa operandos o expresiones internas durante la ejecución de la VM.
 def _evaluar_array_access(nodo):
     nombre_var = nodo.valor
     indice_nodo = nodo.hijos[0]
@@ -1236,6 +1012,24 @@ def _evaluar_array_access(nodo):
     return ambito.obtener_array(nombre_var, indice_valor, nodo=nodo)
 
 
+# Evalúa operandos o expresiones internas durante la ejecución de la VM.
+def _evaluar_matrix_access(nodo):
+    nombre_var = nodo.valor
+    fila_nodo = nodo.hijos[0]
+    columna_nodo = nodo.hijos[1]
+
+    fila_valor = _evaluar_indice_array(fila_nodo)
+    columna_valor = _evaluar_indice_array(columna_nodo)
+
+    ambito, _ = buscar_variable(nombre_var)
+
+    if ambito is None:
+        error_semantico(f"matrix '{nombre_var}' not declared", nodo=nodo)
+
+    return ambito.obtener_matriz(nombre_var, fila_valor, columna_valor, nodo=nodo)
+
+
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
 def _asignar_array_access(array_nodo, expr_nodo, posiciones=None):
     nombre_var = array_nodo.valor
     indice_nodo = array_nodo.hijos[0]
@@ -1267,6 +1061,42 @@ def _asignar_array_access(array_nodo, expr_nodo, posiciones=None):
     )
 
 
+# Apoya una regla semántica concreta dentro del análisis dirigido por sintaxis.
+def _asignar_matrix_access(matrix_nodo, expr_nodo, posiciones=None):
+    nombre_var = matrix_nodo.valor
+    fila_nodo = matrix_nodo.hijos[0]
+    columna_nodo = matrix_nodo.hijos[1]
+
+    fila_valor = _evaluar_indice_array(fila_nodo)
+    columna_valor = _evaluar_indice_array(columna_nodo)
+    valor = evaluarexpresion(expr_nodo)
+
+    ambito, _ = buscar_variable(nombre_var)
+
+    if ambito is None:
+        error_semantico(f"matrix '{nombre_var}' not declared", nodo=matrix_nodo)
+
+    ambito.asignar_matriz(
+        nombre_var,
+        fila_valor,
+        columna_valor,
+        valor,
+        posiciones,
+        0,
+        nodo=matrix_nodo
+    )
+
+    linea, columna = _pos(posiciones, 0)
+    return Nodo(
+        'ASSIGN_MATRIX',
+        nombre_var,
+        [fila_nodo, columna_nodo, expr_nodo],
+        linea=linea,
+        columna=columna
+    )
+
+
+# Selecciona la acción asociada a cada producción reducida por el parser.
 def accion_semantica(produccion, elementos, posiciones=None):
     global funcion_pendiente
     
@@ -1353,6 +1183,36 @@ def accion_semantica(produccion, elementos, posiciones=None):
             columna=columna
         )
     
+    elif lhs == "DeclItem" and rhs == ("ID", "[", "E", "]", "[", "E", "]"):
+        linea, columna = _pos(posiciones, 0)
+
+        return Nodo(
+            'DECL_MATRIX_ITEM',
+            elementos[0],
+            [elementos[2], elementos[5]],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "DeclItem" and rhs == ("ID", "[", "E", "]", "[", "E", "]", "=", "{", "MatrixInitList", "}"):
+        linea, columna = _pos(posiciones, 0)
+
+        init_matrix = Nodo(
+            'INIT_MATRIX',
+            None,
+            elementos[9],
+            linea=linea,
+            columna=columna
+        )
+
+        return Nodo(
+            'DECL_MATRIX_ITEM',
+            elementos[0],
+            [elementos[2], elementos[5], init_matrix],
+            linea=linea,
+            columna=columna
+        )
+    
     elif lhs == "DeclItem" and rhs == ("ID", "[", "E", "]", "=", "{", "InitList", "}"):
         linea, columna = _pos(posiciones, 0)
 
@@ -1383,6 +1243,13 @@ def accion_semantica(produccion, elementos, posiciones=None):
     
     elif lhs == "Assignment" and rhs == ("ArrayAccess", "=", "E"):
         return _asignar_array_access(
+            elementos[0],
+            elementos[2],
+            posiciones
+        )
+    
+    elif lhs == "Assignment" and rhs == ("MatrixAccess", "=", "E"):
+        return _asignar_matrix_access(
             elementos[0],
             elementos[2],
             posiciones
@@ -1719,6 +1586,9 @@ def accion_semantica(produccion, elementos, posiciones=None):
     elif lhs == "Primary" and rhs == ("ArrayAccess",):
         return elementos[0]
     
+    elif lhs == "Primary" and rhs == ("MatrixAccess",):
+        return elementos[0]
+    
     # Funciones
     elif lhs == "FunctionHeader" and rhs == ("TYPE", "ID", "(", ")"):
         tipo_retorno = normalizar_tipo(elementos[0], posiciones, 0)
@@ -2025,6 +1895,33 @@ def accion_semantica(produccion, elementos, posiciones=None):
     elif lhs == "InitList" and rhs == ("InitList", ",", "E"):
         return elementos[0] + [elementos[2]]
 
+    # Inicialización de matrices
+    elif lhs == "MatrixRow" and rhs == ("{", "InitList", "}"):
+        linea, columna = _pos(posiciones, 0)
+        return Nodo(
+            'INIT_LIST',
+            None,
+            elementos[1],
+            linea=linea,
+            columna=columna
+        )
+
+    elif lhs == "MatrixInitList" and rhs == ("MatrixRow",):
+        return [elementos[0]]
+
+    elif lhs == "MatrixInitList" and rhs == ("MatrixInitList", ",", "MatrixRow"):
+        return elementos[0] + [elementos[2]]
+
+    # Matrices
+    elif lhs == "MatrixAccess" and rhs == ("ID", "[", "E", "]", "[", "E", "]"):
+        return _crear_matrix_access(
+            elementos[0],
+            elementos[2],
+            elementos[5],
+            posiciones
+        )
+    
+
     error_semantico(
         f"semantic action not implemented for production: {lhs} -> {' '.join(rhs)}",
         posiciones,
@@ -2032,6 +1929,7 @@ def accion_semantica(produccion, elementos, posiciones=None):
     )
 
 
+# Muestra el AST de forma jerárquica para depuración o salida verbose.
 def imprimir_arbol(nodo, nivel=0):
     if nodo is None:
         return
@@ -2041,13 +1939,23 @@ def imprimir_arbol(nodo, nivel=0):
         imprimir_arbol(hijo, nivel + 1)
 
 
+# Genera una representación DOT del AST para convertirla a SVG o PNG.
 def exportar_arbol_graphviz(nodo, nombre_archivo="ast"):
     if nodo is None:
         print("No AST available.")
         return
 
+    import os
+    import subprocess
+
     dot_path = f"{nombre_archivo}.dot"
     png_path = f"{nombre_archivo}.png"
+    svg_path = f"{nombre_archivo}.svg"
+
+    output_dir = os.path.dirname(os.path.abspath(dot_path))
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
     contador = [0]
     lineas = ["digraph AST {", '    node [shape=box, style="rounded"];']
 
@@ -2069,15 +1977,17 @@ def exportar_arbol_graphviz(nodo, nombre_archivo="ast"):
     recorrer(nodo)
     lineas.append("}")
 
-    with open(dot_path, "w") as archivo:
+    with open(dot_path, "w", encoding="utf-8") as archivo:
         archivo.write("\n".join(lineas))
 
     print(f"AST DOT generated: {dot_path}")
 
     try:
-        import subprocess
+        # One DOT can render multiple output formats.
         subprocess.run(["dot", "-Tpng", dot_path, "-o", png_path], check=True)
-        print(f"AST image generated: {png_path}")
+        print(f"AST PNG generated: {png_path}")
+        subprocess.run(["dot", "-Tsvg", dot_path, "-o", svg_path], check=True)
+        print(f"AST SVG generated: {svg_path}")
     except Exception:
         print("Graphviz image could not be generated.")
         print("You can still open the .dot file with a Graphviz viewer.")

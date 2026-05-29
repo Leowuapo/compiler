@@ -1,3 +1,7 @@
+# PENTA Compiler - documentación interna
+# Gramática y construcción de tablas LALR: contiene producciones, FIRST/FOLLOW, cierres, transiciones y tablas ACTION/GOTO.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from collections import defaultdict
 
 productions = [
@@ -27,10 +31,13 @@ productions = [
     ("DeclItem", ["ID", "=", "E"]),
     ("DeclItem", ["ID", "[", "E", "]"]),
     ("DeclItem", ["ID", "[", "E", "]", "=", "{", "InitList", "}"]),
+    ("DeclItem", ["ID", "[", "E", "]", "[", "E", "]"]),
+    ("DeclItem", ["ID", "[", "E", "]", "[", "E", "]", "=", "{", "MatrixInitList", "}"]),
     
     # Asignación (variable ya declarada)
     ("Assignment", ["ID", "=", "E"]),
     ("Assignment", ["ArrayAccess", "=", "E"]),
+    ("Assignment", ["MatrixAccess", "=", "E"]),
     
     # Bloque con ámbito
     ("Block", ["{", "StatementList", "}"]),
@@ -75,6 +82,7 @@ productions = [
     ("Primary", ["CONST"]),
     ("Primary", ["FunctionCall"]),
     ("Primary", ["ArrayAccess"]),
+    ("Primary", ["MatrixAccess"]),
 
     # If / else
     ("Statement", ["IfStatement"]),
@@ -166,9 +174,17 @@ productions = [
     # Acceso a arreglos
     ("ArrayAccess", ["ID", "[", "E", "]"]),
 
+    # Acceso a matrices
+    ("MatrixAccess", ["ID", "[", "E", "]", "[", "E", "]"]),
+
     # Inicialización de arreglos
     ("InitList", ["E"]),
     ("InitList", ["InitList", ",", "E"]),
+
+    # Inicialización de matrices
+    ("MatrixInitList", ["MatrixRow"]),
+    ("MatrixInitList", ["MatrixInitList", ",", "MatrixRow"]),
+    ("MatrixRow", ["{", "InitList", "}"]),
 ]
 
 prod_num = {}
@@ -193,7 +209,7 @@ no_terminales = {
     "Declaration", "DeclList", "DeclItem", "Assignment", "Block",
     "E", "OrExpr", "AndExpr", "EqExpr", "RelExpr",
     "AddExpr", "MulExpr", "UnaryExpr", "Primary",
-    "ArrayAccess", "InitList",
+    "ArrayAccess", "MatrixAccess", "InitList", "MatrixInitList", "MatrixRow",
     "IfStatement", "WhileStatement", 
     "ForStatement", "ForInit", "ForUpdate",
     "SwitchStatement", "CaseList", "CaseItem", "DefaultItem",
@@ -231,6 +247,7 @@ while cambio:
                 primeros[lado_izq].add("ε")
                 cambio = True
 
+# Participa en la construcción de conjuntos, transiciones o tablas del parser LALR.
 def primero_de_cadena(simbolos):
     resultado = set()
     for X in simbolos:
@@ -240,6 +257,7 @@ def primero_de_cadena(simbolos):
     resultado.add("ε")
     return resultado
 
+# Participa en la construcción de conjuntos, transiciones o tablas del parser LALR.
 def cierre_lr1(items):
     conjunto = set(items)
     while True:
@@ -260,6 +278,7 @@ def cierre_lr1(items):
         conjunto |= nuevos
     return frozenset(conjunto)
 
+# Participa en la construcción de conjuntos, transiciones o tablas del parser LALR.
 def ir_a(items, X):
     siguientes = set()
     for lado_izq, lado_der, punto, la in items:
@@ -269,6 +288,7 @@ def ir_a(items, X):
         return None
     return cierre_lr1(siguientes)
 
+# Participa en la construcción de conjuntos, transiciones o tablas del parser LALR.
 def construir_estados_lr1():
     inicio = cierre_lr1({("Program'", ("Program",), 0, "$")})
     estados = [inicio]
@@ -287,6 +307,7 @@ def construir_estados_lr1():
         i += 1
     return estados, transiciones, indice_estado
 
+# Participa en la construcción de conjuntos, transiciones o tablas del parser LALR.
 def fusionar_lalr(estados_lr1):
     nucleo_a_items = defaultdict(set)
     for items in estados_lr1:
@@ -294,6 +315,7 @@ def fusionar_lalr(estados_lr1):
         nucleo_a_items[nucleo] |= items
     return list(nucleo_a_items.values())
 
+# Participa en la construcción de conjuntos, transiciones o tablas del parser LALR.
 def agregar_action(action, estado, simbolo, nueva):
     if simbolo in action[estado] and action[estado][simbolo] != nueva:
         raise Exception(
@@ -302,6 +324,7 @@ def agregar_action(action, estado, simbolo, nueva):
         )
     action[estado][simbolo] = nueva
 
+# Participa en la construcción de conjuntos, transiciones o tablas del parser LALR.
 def construir_tabla_lalr():
     estados_lr1, goto_trans, _ = construir_estados_lr1()
     estados_lalr = fusionar_lalr(estados_lr1)

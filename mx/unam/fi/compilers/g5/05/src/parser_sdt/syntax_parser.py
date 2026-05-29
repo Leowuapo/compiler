@@ -1,127 +1,33 @@
+# PENTA Compiler - documentación interna
+# Parser LALR con acciones semánticas: consume tokens, valida la sintaxis y coordina AST, TAC, optimización, target code y VM.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 from .parsertable import tabla_action, tabla_goto, productions
 from .sdt import tabla_simbolos, tabla_funciones, accion_semantica, imprimir_arbol, exportar_arbol_graphviz, reset_semantica, entrar_ambito, salir_ambito
+from backend.tac import generar_tac, imprimir_tac, guardar_tac
+from backend.optimizer import optimizar_tac, imprimir_tac_optimizado, guardar_tac_optimizado
+from backend.target_code import generar_target_code, imprimir_target_code, guardar_target_code
+from backend.vm import ejecutar_target_code
 import traceback
+import os
+import re
+from contextlib import redirect_stdout
+from io import StringIO
+
+from .pipeline.artifacts import (
+    build_artifact_paths as _build_artifact_paths,
+    run_name_from_source as _run_name_from_source,
+    slugify as _slugify,
+)
+from .pipeline.reporting import imprimir_resumen_ejecucion
+from .pipeline.token_mapper import mapear_tokens
 
 ultimo_ast = None
 ultimo_resultado = None
 
 
-def mapear_tokens(tokens):
-    simbolos = []
-    lexemas = []
-    posiciones = []
-    
-    valid_types = {
-        'int', 'float', 'double', 'char',
-        'void', 'bool', 'long', 'short', 'unsigned'
-    }
-
-    for tipo, valor, linea, columna in tokens:
-        if tipo == 'keyword' and valor in valid_types:
-            simbolos.append('TYPE')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'keyword' and valor == 'main':
-            simbolos.append('ID')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-        
-        elif tipo == 'keyword' and valor in {
-            'if', 'else', 'while', 'for',
-            'switch', 'case', 'default',
-            'break', 'continue', 'return',
-            'print', 'printf'
-        }:
-            simbolos.append(valor)
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'identifier' and valor in {'true', 'false'}:
-            simbolos.append('CONST')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'identifier':
-            simbolos.append('ID')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'constant':
-            simbolos.append('CONST')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-        
-        elif tipo == 'literal':
-            simbolos.append('CONST')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'operator' and valor in {
-            '=', '+', '-', '*', '/', '%',
-            '&&', '||', '!',
-            '==', '!=', '<', '>', '<=', '>=',
-            '++', '--'
-        }:
-            simbolos.append(valor)
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == ',':
-            simbolos.append(',')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == ';':
-            simbolos.append(';')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == '(':
-            simbolos.append('(')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == ')':
-            simbolos.append(')')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == '{':
-            simbolos.append('{')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == '}':
-            simbolos.append('}')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == '[':
-            simbolos.append('[')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        elif tipo == 'punctuation' and valor == ']':
-            simbolos.append(']')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-        
-        elif tipo == 'punctuation' and valor == ':':
-            simbolos.append(':')
-            lexemas.append(valor)
-            posiciones.append((linea, columna))
-
-        else:
-            raise Exception(f"Unexpected token: {tipo} {valor}")
-        
-    simbolos.append('$')
-    lexemas.append('$')
-
-    posiciones.append((None, None))
-    return simbolos, lexemas, posiciones
-
-def analizar(tokens, ast_base_path="ast"):
+# Ejecuta el ciclo shift/reduce y dispara acciones semánticas al reducir producciones.
+def analizar(tokens, ast_base_path="ast", output_dir=None, verbose=True, source_path=None):
     global ultimo_ast, ultimo_resultado
     ultimo_ast = None
     ultimo_resultado = {
@@ -132,11 +38,12 @@ def analizar(tokens, ast_base_path="ast"):
     }
     reset_semantica()
 
+    artifacts = _build_artifact_paths(output_dir, ast_base_path, source_path)
+    ast_base_path = os.path.splitext(artifacts["ast_dot"])[0]
+    output_dir = artifacts["base_dir"]
+
     try:
         entrada, lexemas, posiciones = mapear_tokens(tokens)
-        #print(f"[DEBUG] Entrada (tokens): {entrada}")
-        #print(f"[DEBUG] Lexemas: {lexemas}")
-        #print(f"[DEBUG] Longitud de entrada: {len(entrada)}")
     except Exception as e:
         print(f"Token mapping error: {e}")
         traceback.print_exc()
@@ -156,12 +63,9 @@ def analizar(tokens, ast_base_path="ast"):
         estado = pila[-1]
         token = entrada[pos]
 
-        #print(f"[DEBUG] Estado actual: {estado}, Token actual: '{token}', Posición: {pos}")
-        #print(f"[DEBUG] Tabla ACTION para estado {estado}: {tabla_action.get(estado, {})}")
 
         accion = tabla_action.get(estado, {}).get(token)
 
-        #print(f"[DEBUG] Acción encontrada: {accion}")
 
         if accion is None:
             linea, columna = posiciones[pos]
@@ -235,22 +139,66 @@ def analizar(tokens, ast_base_path="ast"):
             pila.append(siguiente)
 
         elif accion == 'acc':
-            print("Parsing Success!")
+            if verbose:
+                print("Parsing Success!")
 
             if sdt_correcto:
-                print("SDT Verified!")
-                
-                print("Symbol table:")
-                tabla_simbolos.mostrar()
+                if verbose:
+                    print("SDT Verified!")
+                    
+                    print("Symbol table:")
+                    tabla_simbolos.mostrar()
 
-                print("Function table:")
-                tabla_funciones.mostrar()
+                    print("Function table:")
+                    tabla_funciones.mostrar()
 
-                print("Parse/AST tree:")
-                imprimir_arbol(pila_sem[-1])
+                    print("Parse/AST tree:")
+                    imprimir_arbol(pila_sem[-1])
 
                 ultimo_ast = pila_sem[-1]
-                exportar_arbol_graphviz(ultimo_ast, ast_base_path)
+
+                if verbose:
+                    exportar_arbol_graphviz(ultimo_ast, ast_base_path)
+                else:
+                    with redirect_stdout(StringIO()):
+                        exportar_arbol_graphviz(ultimo_ast, ast_base_path)
+
+                tac = generar_tac(ultimo_ast)
+                guardar_tac(tac, artifacts["tac"])
+
+                if verbose:
+                    print("TAC:")
+                    imprimir_tac(tac)
+
+                tac_optimizado = optimizar_tac(tac)
+                guardar_tac_optimizado(tac_optimizado, artifacts["tac_optimized"])
+
+                if verbose:
+                    print("Optimized TAC:")
+                    imprimir_tac_optimizado(tac_optimizado)
+
+                target_code = generar_target_code(tac_optimizado)
+                guardar_target_code(target_code, artifacts["target_code"])
+
+                if verbose:
+                    print("Target Code:")
+                    imprimir_target_code(target_code)
+
+                vm_resultado = None
+                vm_executed = False
+
+                if any(instr.op == "FUNC" and instr.args[0] == "main" for instr in target_code):
+                    vm_executed = True
+                    if verbose:
+                        print("VM Execution:")
+                    vm_resultado = ejecutar_target_code(
+                        target_code,
+                        entry_point="main",
+                        mostrar_salida=verbose,
+                    )
+                elif verbose:
+                    print("VM Execution skipped: main function not found")
+
                 ultimo_resultado = {
                     "ok": True,
                     "fase": "semantic",
@@ -258,7 +206,18 @@ def analizar(tokens, ast_base_path="ast"):
                     "ast": ultimo_ast,
                     "symbol_table": tabla_simbolos.simbolos,
                     "function_table": tabla_funciones.funciones,
+                    "tac": tac,
+                    "tac_optimized": tac_optimizado,
+                    "target_code": target_code,
+                    "vm_resultado": vm_resultado,
+                    "vm_executed": vm_executed,
+                    "artifacts": artifacts,
+                    "source_path": source_path,
+                    "output_dir": output_dir,
                 }
+
+                if not verbose:
+                    imprimir_resumen_ejecucion(ultimo_resultado)
 
                 return True
             
@@ -278,6 +237,9 @@ def analizar(tokens, ast_base_path="ast"):
             print("Parsing error...")
             return False
 
+
+
+# Encapsula una parte puntual del flujo para mantener el archivo legible y reutilizable.
 def obtener_ultimo_resultado():
     """Devuelve el resultado detallado de la última ejecución del parser.
 

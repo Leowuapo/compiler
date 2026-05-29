@@ -1,9 +1,15 @@
+# PENTA Compiler - documentación interna
+# Lexer del compilador: transforma el texto fuente en una lista ordenada de tokens con línea y columna.
+# Los comentarios explican intención y responsabilidades; no cambian la lógica del programa.
+
 import re
-from .lexertable import token              
+from .lexertable import token
 
 # Compilamos los patrones una sola vez
 compiled_tokens = [(re.compile(pattern), token_type) for pattern, token_type in token]
 
+
+# Recorre el código fuente línea por línea y produce tokens con su posición exacta.
 def tokenize(code):
     lista_tokens = []
 
@@ -38,16 +44,37 @@ def tokenize(code):
 
     return lista_tokens
 
+
+# Lee archivos fuente usando UTF-8 y un respaldo compatible con archivos antiguos.
+def _read_source_file(ruta):
+    """Read source code consistently across Windows, Linux and macOS.
+
+    UTF-8 is tried first because it is the safest default for shared projects.
+    Latin-1 is kept as a fallback so older files do not crash immediately.
+    """
+    try:
+        with open(ruta, "r", encoding="utf-8") as archivo:
+            return archivo.read()
+    except UnicodeDecodeError:
+        with open(ruta, "r", encoding="latin-1") as archivo:
+            return archivo.read()
+
+
+# Carga un archivo y lo envía al tokenizer.
 def analizearchive(ruta):
     try:
-        with open(ruta,'r') as archivo:
-            code = archivo.read()    
-    
-        return tokenize(code) #retornamos la lista de nuestros tokens totales
-        
+        code = _read_source_file(ruta)
+        return tokenize(code)  # retornamos la lista de nuestros tokens totales
+
     except FileNotFoundError:
         print(f"Error, file not found in {ruta}")
         return None
 
+    except OSError as exc:
+        print(f"Error reading file '{ruta}': {exc}")
+        return None
+
+
+# Tokeniza código recibido directamente como cadena.
 def analizeterminal(code):
     return tokenize(code)
