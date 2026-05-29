@@ -1,103 +1,110 @@
 # PENTA Compiler
 
--- Compilador desarrollado por el **Equipo 5** — Facultad de Ingeniería, UNAM. --
+> A C-subset compiler developed by **Team 5** for the Compilers course — Faculty of Engineering, UNAM.
 
+---
 
-## Tabla de contenidos
+## Table of Contents
 
-- [Descripción general](#descripción-general)
-- [Arquitectura del compilador](#arquitectura-del-compilador)
-- [Requisitos del sistema](#requisitos-del-sistema)
-- [Instalación](#instalación)
-- [Uso](#uso)
-  - [Interfaz gráfica (GUI)](#interfaz-gráfica-gui)
-  - [Línea de comandos (CLI)](#línea-de-comandos-cli)
-  - [Modo interactivo](#modo-interactivo)
-- [Artefactos generados](#artefactos-generados)
-- [Pruebas incluidas](#pruebas-incluidas)
-- [Verificación del entorno](#verificación-del-entorno)
-- [Estructura del repositorio](#estructura-del-repositorio)
-- [Licencia](#licencia)
+- [Overview](#overview)
+- [Compiler Architecture](#compiler-architecture)
+- [System Requirements](#system-requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Graphical Interface (GUI)](#graphical-interface-gui)
+  - [Command Line (CLI)](#command-line-cli)
+  - [Interactive Mode](#interactive-mode)
+- [Generated Artifacts](#generated-artifacts)
+- [Included Tests](#included-tests)
+- [Environment Check](#environment-check)
+- [Repository Structure](#repository-structure)
+- [License](#license)
 
-## Descripción general
+---
 
-PENTA Compiler es un compilador completo para un subconjunto del lenguaje C que abarca todas las fases clásicas de compilación: análisis léxico, análisis sintáctico, análisis semántico con traducción dirigida por sintaxis (SDT), generación de código intermedio (TAC), optimización y generación de código objetivo. Adicionalmente, incluye una máquina virtual para ejecutar el código generado.
+## Overview
 
-El proyecto cuenta tanto con una interfaz gráfica moderna (GUI) como con una interfaz de línea de comandos (CLI), lo que permite su uso en entornos de desarrollo y de demostración.
+PENTA Compiler is a full compiler for a subset of the C language covering all classic compilation phases: lexical analysis, syntactic analysis, semantic analysis with syntax-directed translation (SDT), intermediate code generation (TAC), optimization, and target code generation. It also includes a virtual machine to execute the generated code.
 
-## Arquitectura del compilador
+The project provides both a modern graphical interface (GUI) and a command-line interface (CLI), making it suitable for development and demonstration environments.
+
+---
+
+## Compiler Architecture
 
 ```
-Código fuente (.c)
+Source code (.c)
         │
         ▼
 ┌───────────────┐
 │  Lexer        │  lector.py / lexertable.py
-│  (Análisis    │  → Produce lista de tokens con línea y columna
-│   léxico)     │
+│               │  → Produces a token list with line and column info
 └──────┬────────┘
        │ tokens
        ▼
 ┌───────────────┐
 │  Parser +     │  syntax_parser.py / sdt.py
-│  SDT          │  → Construye el AST y valida semántica
-│  (Sintáctico  │     (tipos, ámbitos, funciones, flujo de control)
-│   + Semántico)│
+│  SDT          │  → Builds the AST and validates semantics
+│               │     (types, scopes, functions, control flow)
 └──────┬────────┘
        │ AST
        ▼
 ┌───────────────┐
-│  Generación   │  tac.py
-│  de TAC       │  → Código intermedio de tres direcciones
+│  TAC          │  tac.py
+│  Generation   │  → Three-address intermediate code
 └──────┬────────┘
        │ TAC
        ▼
 ┌───────────────┐
-│  Optimización │  optimizer.py
-│  de TAC       │  → Propagación de constantes/copias,
-│               │     simplificación algebraica,
-│               │     eliminación de temporales muertos
+│  TAC          │  optimizer.py
+│  Optimizer    │  → Constant/copy propagation,
+│               │     algebraic simplification,
+│               │     dead temporary elimination
 └──────┬────────┘
-       │ TAC optimizado
+       │ Optimized TAC
        ▼
 ┌───────────────┐
-│  Código       │  target_code.py
-│  objetivo     │  → Ensamblador / representación final
+│  Target Code  │  target_code.py
+│  Generation   │  → Assembly / final representation
 └──────┬────────┘
        │
        ▼
 ┌───────────────┐
-│  Máquina      │  vm.py
-│  Virtual      │  → Ejecución del código generado
+│  Virtual      │  vm.py
+│  Machine      │  → Executes the generated code
 └───────────────┘
 ```
 
-## Requisitos del sistema
+---
 
-| Componente     | Versión mínima | Notas |
-|----------------|----------------|-------|
-| Python         | 3.10           | Requerido |
-| Tkinter        | Incluido con Python | Requerido para GUI |
-| CustomTkinter  | ≥ 5.2.2        | Requerido para GUI |
-| Pillow         | ≥ 10.0.0       | Opcional — carga de imágenes y logos |
-| Graphviz (`dot`) | Cualquiera   | Opcional — visualización del AST como SVG/PNG |
+## System Requirements
 
-## Instalación
+| Component       | Minimum Version     | Notes |
+|-----------------|---------------------|-------|
+| Python          | 3.10                | Required |
+| Tkinter         | Bundled with Python | Required for GUI |
+| CustomTkinter   | ≥ 5.2.2             | Required for GUI |
+| Pillow          | ≥ 10.0.0            | Optional — image and logo loading |
+| Graphviz (`dot`) | Any               | Optional — AST visualization as SVG/PNG |
 
-### 1. Clonar el repositorio
+---
+
+## Installation
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/<org>/compiler.git
 cd compiler
 ```
 
-### 2. Instalar dependencias de Python
+### 2. Install Python dependencies
 
 ```bash
 pip install -r mx/unam/fi/compilers/g5/05/requirements.txt
 ```
 
-### 3. Instalar Graphviz (opcional, para visualización del AST)
+### 3. Install Graphviz (optional, for AST visualization)
 
 **Linux (Debian/Ubuntu):**
 ```bash
@@ -110,21 +117,23 @@ brew install graphviz
 ```
 
 **Windows:**
-Descarga el instalador desde [graphviz.org/download](https://graphviz.org/download/) y agrega la carpeta `bin` al PATH del sistema (normalmente `C:\Program Files\Graphviz\bin`).
+Download the installer from [graphviz.org/download](https://graphviz.org/download/) and add the `bin` folder to the system PATH (typically `C:\Program Files\Graphviz\bin`).
 
-### 4. Verificar el entorno
+### 4. Verify the environment
 
 ```bash
 python mx/unam/fi/compilers/g5/05/tools/check_environment.py
 ```
 
-Este comando valida Python, Tkinter, CustomTkinter, Pillow y Graphviz, y ejecuta un smoke test de compilación automático.
+This command checks Python, Tkinter, CustomTkinter, Pillow, and Graphviz, and runs an automatic compilation smoke test.
 
-## Uso
+---
 
-Todos los comandos deben ejecutarse desde la **raíz del repositorio**.
+## Usage
 
-### Interfaz gráfica (GUI)
+All commands should be run from the **repository root**.
+
+### Graphical Interface (GUI)
 
 **Linux / macOS:**
 ```bash
@@ -136,94 +145,102 @@ bash mx/unam/fi/compilers/g5/05/scripts/run_gui.sh
 .\mx\unam\fi\compilers\g5\05\scripts\run_gui.ps1
 ```
 
-### Línea de comandos (CLI)
+### Command Line (CLI)
 
 **Linux / macOS:**
 ```bash
-# Compilar un archivo fuente
-bash mx/unam/fi/compilers/g5/05/scripts/run_cli.sh ruta/al/archivo.c
+# Compile a source file
+bash mx/unam/fi/compilers/g5/05/scripts/run_cli.sh path/to/file.c
 
-# Compilar con salida verbose (imprime AST, TAC y código objetivo en consola)
-bash mx/unam/fi/compilers/g5/05/scripts/run_cli.sh ruta/al/archivo.c --verbose
+# Compile with verbose output (prints AST, TAC, and target code to console)
+bash mx/unam/fi/compilers/g5/05/scripts/run_cli.sh path/to/file.c --verbose
 
-# Especificar directorio de salida
-bash mx/unam/fi/compilers/g5/05/scripts/run_cli.sh ruta/al/archivo.c -o salida/
+# Specify an output directory
+bash mx/unam/fi/compilers/g5/05/scripts/run_cli.sh path/to/file.c -o output/
 
-# Ingresar código directamente desde la terminal
+# Enter code directly from the terminal
 bash mx/unam/fi/compilers/g5/05/scripts/run_cli.sh --terminal
 ```
 
 **Windows (PowerShell):**
 ```powershell
-.\mx\unam\fi\compilers\g5\05\scripts\run_cli.ps1 ruta\al\archivo.c
-.\mx\unam\fi\compilers\g5\05\scripts\run_cli.ps1 ruta\al\archivo.c --verbose
+.\mx\unam\fi\compilers\g5\05\scripts\run_cli.ps1 path\to\file.c
+.\mx\unam\fi\compilers\g5\05\scripts\run_cli.ps1 path\to\file.c --verbose
 ```
 
-#### Opciones disponibles
+#### Available options
 
-| Argumento            | Descripción |
+| Argument             | Description |
 |----------------------|-------------|
-| `source`             | Ruta al archivo fuente `.c` (opcional; sin él, activa el modo interactivo) |
-| `-o`, `--output-dir` | Directorio donde se guardarán los artefactos generados |
-| `-v`, `--verbose`    | Imprime en consola el AST, TAC, TAC optimizado y código objetivo |
-| `--terminal`         | Lee el código fuente directamente desde la entrada de la terminal |
+| `source`             | Path to the `.c` source file (optional; omitting it activates interactive mode) |
+| `-o`, `--output-dir` | Directory where generated artifacts will be saved |
+| `-v`, `--verbose`    | Prints AST, TAC, optimized TAC, and target code to the console |
+| `--terminal`         | Reads source code directly from terminal input |
 
-### Modo interactivo
+### Interactive Mode
 
-Si se ejecuta sin argumentos, el compilador solicita elegir entre cargar un archivo o ingresar código directamente:
+When run without arguments, the compiler prompts you to choose between loading a file or entering code directly:
 
 ```
 Select how you will enter your code (archive/terminal):
 ```
 
-## Artefactos generados
+---
 
-Cada compilación genera una carpeta en `src/outputs/<nombre_archivo>/` con los siguientes artefactos:
+## Generated Artifacts
+
+Each compilation produces a folder under `src/outputs/<filename>/` containing:
 
 ```
 outputs/
-└── mi_programa/
+└── my_program/
     ├── ast/
-    │   └── ast_mi_programa.dot        # Árbol sintáctico abstracto (formato Graphviz)
+    │   └── ast_my_program.dot              # Abstract syntax tree (Graphviz format)
     ├── ir/
-    │   ├── tac_mi_programa.ir         # Código intermedio TAC
-    │   └── tac_optimized_mi_programa.ir  # TAC después de optimizaciones
+    │   ├── tac_my_program.ir               # TAC intermediate code
+    │   └── tac_optimized_my_program.ir     # TAC after optimizations
     └── target/
-        └── target_code_mi_programa.asm   # Código objetivo generado
+        └── target_code_my_program.asm      # Generated target code
 ```
 
-## Pruebas incluidas
+---
 
-El directorio `src/tests/` contiene casos de prueba organizados por categoría:
+## Included Tests
 
-| Categoría                   | Descripción |
+The `src/tests/` directory contains test cases organized by category:
+
+| Category                    | Description |
 |-----------------------------|-------------|
-| `valid/`                    | Programas correctos que deben compilar exitosamente |
-| `lexical_errors/`           | Errores como símbolos inválidos o cadenas sin cerrar |
-| `syntax_errors/`            | Errores como punto y coma faltante o uso de `do-while` (no soportado) |
-| `semantic_errors/`          | Errores de tipo, uso antes de inicialización, retorno incorrecto, etc. |
-| `runtime_errors_optional/`  | Casos opcionales de errores en tiempo de ejecución |
+| `valid/`                    | Correct programs that should compile successfully |
+| `lexical_errors/`           | Errors such as invalid symbols or unclosed strings |
+| `syntax_errors/`            | Errors such as missing semicolons or unsupported `do-while` |
+| `semantic_errors/`          | Type errors, use-before-init, return type mismatches, etc. |
+| `runtime_errors_optional/`  | Optional runtime error cases |
 
-**Ejemplo de prueba válida:**
+**Example — running a valid test:**
 ```bash
 bash mx/unam/fi/compilers/g5/05/scripts/run_cli.sh \
   mx/unam/fi/compilers/g5/05/src/tests/valid/01_full_feature_success.c --verbose
 ```
 
-## Verificación del entorno
+---
+
+## Environment Check
 
 ```bash
-# Verificación completa (dependencias + smoke test)
+# Full check (dependencies + smoke test)
 python mx/unam/fi/compilers/g5/05/tools/check_environment.py
 
-# Solo smoke test
+# Smoke test only
 python mx/unam/fi/compilers/g5/05/tools/check_environment.py --smoke-only
 
-# Solo dependencias
+# Dependencies only
 python mx/unam/fi/compilers/g5/05/tools/check_environment.py --no-smoke
 ```
 
-## Estructura del repositorio
+---
+
+## Repository Structure
 
 ```
 compiler/
@@ -233,34 +250,34 @@ compiler/
 └── mx/unam/fi/compilers/g5/05/
     ├── requirements.txt
     ├── scripts/
-    │   ├── run_cli.sh          # Arranque CLI en Linux/macOS
-    │   ├── run_cli.ps1         # Arranque CLI en Windows
-    │   ├── run_gui.sh          # Arranque GUI en Linux/macOS
-    │   └── run_gui.ps1         # Arranque GUI en Windows
+    │   ├── run_cli.sh           # CLI launcher for Linux/macOS
+    │   ├── run_cli.ps1          # CLI launcher for Windows
+    │   ├── run_gui.sh           # GUI launcher for Linux/macOS
+    │   └── run_gui.ps1          # GUI launcher for Windows
     ├── tools/
-    │   └── check_environment.py  # Validador de entorno y smoke test
+    │   └── check_environment.py # Environment validator and smoke test
     ├── doc/
-    │   └── 05-Compilers-Parser.pdf  # Documentación técnica del parser
+    │   └── 05-Compilers-Parser.pdf  # Parser technical documentation
     └── src/
-        ├── main.py             # Punto de entrada CLI
-        ├── GUI.py              # Interfaz gráfica
-        ├── deps_checker.py     # Verificador de dependencias
+        ├── main.py              # CLI entry point
+        ├── GUI.py               # Graphical interface
+        ├── deps_checker.py      # Dependency checker
         ├── lexer/
-        │   ├── lector.py       # Tokenizador
-        │   └── lexertable.py   # Tabla de patrones léxicos
+        │   ├── lector.py        # Tokenizer
+        │   └── lexertable.py    # Lexical pattern table
         ├── parser_sdt/
-        │   ├── syntax_parser.py  # Parser sintáctico
-        │   ├── sdt.py            # Traducción dirigida por sintaxis
-        │   ├── parsertable.py    # Tabla de parsing
-        │   ├── pipeline/         # Artefactos y reportes del pipeline
-        │   └── semantic/         # AST, tabla de símbolos, tipos, errores
+        │   ├── syntax_parser.py # Syntactic parser
+        │   ├── sdt.py           # Syntax-directed translation
+        │   ├── parsertable.py   # Parsing table
+        │   ├── pipeline/        # Pipeline artifacts and reports
+        │   └── semantic/        # AST nodes, symbol table, types, errors
         ├── backend/
-        │   ├── tac.py            # Generación de TAC
-        │   ├── optimizer.py      # Optimización de TAC
-        │   ├── target_code.py    # Generación de código objetivo
-        │   └── vm.py             # Máquina virtual
+        │   ├── tac.py           # TAC generation
+        │   ├── optimizer.py     # TAC optimization
+        │   ├── target_code.py   # Target code generation
+        │   └── vm.py            # Virtual machine
         ├── assets/
-        │   └── grammar/          # Visualizador HTML de la gramática
+        │   └── grammar/         # HTML grammar visualizer
         └── tests/
             ├── valid/
             ├── lexical_errors/
@@ -269,10 +286,12 @@ compiler/
             └── runtime_errors_optional/
 ```
 
-## Licencia
+---
 
-Este proyecto está disponible bajo los términos descritos en el archivo [LICENSE](LICENSE).
+## License
+
+This project is available under the terms described in the [LICENSE](LICENSE) file.
 
 ---
 
-*Equipo 5 — Compiladores, Facultad de Ingeniería, UNAM*
+*Team 5 — Compilers, Faculty of Engineering, UNAM*
